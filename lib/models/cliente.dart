@@ -1,17 +1,27 @@
-import 'package:hive/hive.dart';
-part 'cliente.g.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-@HiveType(typeId: 3)
-class Cliente extends HiveObject {
-  @HiveField(0)
-  late String id;
+class Cliente {
+  final String id;
+  final String nombre;
+  final bool activo;
+  final DateTime creadoEn;
 
-  @HiveField(1)
-  late String nombre;
+  const Cliente({
+    required this.id,
+    required this.nombre,
+    required this.activo,
+    required this.creadoEn,
+  });
 
-  @HiveField(2)
-  late bool activo;
-
-  @HiveField(3)
-  late DateTime creadoEn;
+  factory Cliente.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return Cliente(
+      id: doc.id,
+      nombre: d['nombre'] ?? '',
+      activo: d['activo'] ?? true,
+      creadoEn: d['creadoEn'] != null
+          ? (d['creadoEn'] as Timestamp).toDate()
+          : DateTime.now(),
+    );
+  }
 }

@@ -1,9 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/rangos_provider.dart';
-import '../../providers/ingresos_provider.dart';
-import '../../providers/salidas_provider.dart';
+import '../../models/ingreso.dart';
+import '../../models/salida.dart';
 import '../../utils/constants.dart';
 import '../../utils/formatters.dart';
 
@@ -33,12 +32,13 @@ class _ReporteTotalesScreenState extends State<ReporteTotalesScreen>
 
   @override
   Widget build(BuildContext context) {
-    final rangosAves =
-        context.watch<RangosProvider>().activosAves;
-    final rangosMenud =
-        context.watch<RangosProvider>().activosMenudencias;
-    final ingresosP = context.watch<IngresosProvider>();
-    final salidasP = context.watch<SalidasProvider>();
+    final todos = context.watch<List<Ingreso>>();
+    final todasSalidas = context.watch<List<Salida>>();
+
+    final ingresosDelDia =
+        todos.where((i) => _sameDay(i.timestamp, _selectedDate)).toList();
+    final salidasDelDia =
+        todasSalidas.where((s) => _sameDay(s.timestamp, _selectedDate)).toList();
 
     return Scaffold(
       body: Column(
@@ -71,18 +71,22 @@ class _ReporteTotalesScreenState extends State<ReporteTotalesScreen>
               controller: _tab,
               children: [
                 _TotalesView(
-                  rangos: rangosAves,
                   tipo: kTipoAves,
-                  selectedDate: _selectedDate,
-                  ingresosP: ingresosP,
-                  salidasP: salidasP,
+                  ingresos: ingresosDelDia
+                      .where((i) => i.rangoTipo == kTipoAves)
+                      .toList(),
+                  salidas: salidasDelDia
+                      .where((s) => s.rangoTipo == kTipoAves)
+                      .toList(),
                 ),
                 _TotalesView(
-                  rangos: rangosMenud,
                   tipo: kTipoMenudencias,
-                  selectedDate: _selectedDate,
-                  ingresosP: ingresosP,
-                  salidasP: salidasP,
+                  ingresos: ingresosDelDia
+                      .where((i) => i.rangoTipo == kTipoMenudencias)
+                      .toList(),
+                  salidas: salidasDelDia
+                      .where((s) => s.rangoTipo == kTipoMenudencias)
+                      .toList(),
                 ),
               ],
             ),
@@ -101,42 +105,47 @@ class _ReporteTotalesScreenState extends State<ReporteTotalesScreen>
     );
     if (picked != null) setState(() => _selectedDate = picked);
   }
+
+  static bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
+// ── Vista por tipo ─────────────────────────────────────────────────────────
+
 class _TotalesView extends StatelessWidget {
-  final List rangos;
   final String tipo;
-  final DateTime selectedDate;
-  final IngresosProvider ingresosP;
-  final SalidasProvider salidasP;
+  final List<Ingreso> ingresos;
+  final List<Salida> salidas;
 
   const _TotalesView({
-    required this.rangos,
     required this.tipo,
-    required this.selectedDate,
-    required this.ingresosP,
-    required this.salidasP,
+    required this.ingresos,
+    required this.salidas,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (rangos.isEmpty) {
-      return const Center(child: Text('Sin rangos configurados'));
+    if (ingresos.isEmpty && salidas.isEmpty) {
+      return const Center(
+          child: Text('Sin movimientos para esta fecha'));
     }
 
-    final rows = rangos.map((rango) {
-      final ingresos = ingresosP
-          .porFecha(selectedDate)
-          .where((i) => i.rangoId == rango.id);
-      final salidas = salidasP
-          .porFecha(selectedDate)
-          .where((s) => s.rangoId == rango.id);
+    // Agrupar por rangoNombre (usando campo denormalizado)
+    final nombres = <String>{
+      ...ingresos.map((i) => i.rangoNombre),
+      ...salidas.map((s) => s.rangoNombre),
+    }.toList()
+      ..sort();
+
+    final rows = nombres.map((nombre) {
+      final ing = ingresos.where((i) => i.rangoNombre == nombre);
+      final sal = salidas.where((s) => s.rangoNombre == nombre);
       return _Row(
-        nombre: rango.nombre,
-        unidIn: ingresos.fold(0, (s, e) => s + e.unidades),
-        pesoIn: ingresos.fold(0.0, (s, e) => s + e.peso),
-        unidOut: salidas.fold(0, (s, e) => s + e.unidades),
-        pesoOut: salidas.fold(0.0, (s, e) => s + e.peso),
+        nombre: nombre,
+        unidIn: ing.fold(0, (s, e) => s + e.unidades),
+        pesoIn: ing.fold(0.0, (s, e) => s + e.peso),
+        unidOut: sal.fold(0, (s, e) => s + e.unidades),
+        pesoOut: sal.fold(0.0, (s, e) => s + e.peso),
       );
     }).toList();
 
@@ -154,7 +163,7 @@ class _TotalesView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Summary chips
+          // Chips de resumen
           Row(
             children: [
               _ChipSummary(
@@ -179,18 +188,19 @@ class _TotalesView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          // Bar chart
+          // Gráfico de barras
           if (rows.any((r) => r.unidIn > 0 || r.unidOut > 0)) ...[
             Text('Unidades por rango',
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             SizedBox(
               height: 220,
-              child: _BarChart(rows: rows, colorIn: colorIn, colorOut: colorOut),
+              child: _BarChart(
+                  rows: rows, colorIn: colorIn, colorOut: colorOut),
             ),
             const SizedBox(height: 16),
           ],
-          // Table
+          // Tabla de detalle
           Text('Detalle', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 4),
           SingleChildScrollView(
@@ -219,13 +229,17 @@ class _TotalesView extends StatelessWidget {
                     const DataCell(Text('TOTAL',
                         style: TextStyle(fontWeight: FontWeight.bold))),
                     DataCell(Text(formatNum(totalUnidIn),
-                        style: const TextStyle(fontWeight: FontWeight.bold))),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold))),
                     DataCell(Text(formatNum(totalPesoIn),
-                        style: const TextStyle(fontWeight: FontWeight.bold))),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold))),
                     DataCell(Text(formatNum(totalUnidOut),
-                        style: const TextStyle(fontWeight: FontWeight.bold))),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold))),
                     DataCell(Text(formatNum(totalPesoOut),
-                        style: const TextStyle(fontWeight: FontWeight.bold))),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold))),
                   ],
                 ),
               ],
@@ -236,6 +250,8 @@ class _TotalesView extends StatelessWidget {
     );
   }
 }
+
+// ── Gráfico de barras ──────────────────────────────────────────────────────
 
 class _BarChart extends StatelessWidget {
   final List<_Row> rows;
@@ -257,13 +273,15 @@ class _BarChart extends StatelessWidget {
             toY: r.unidIn.toDouble(),
             color: colorIn,
             width: 14,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(4)),
           ),
           BarChartRodData(
             toY: r.unidOut.toDouble(),
             color: colorOut,
             width: 14,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(4)),
           ),
         ],
         barsSpace: 4,
@@ -296,10 +314,10 @@ class _BarChart extends StatelessWidget {
               },
             ),
           ),
-          topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false)),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
         gridData: const FlGridData(show: true),
         borderData: FlBorderData(show: false),
@@ -318,6 +336,8 @@ class _BarChart extends StatelessWidget {
     );
   }
 }
+
+// ── Modelos y helpers de UI ────────────────────────────────────────────────
 
 class _Row {
   final String nombre;

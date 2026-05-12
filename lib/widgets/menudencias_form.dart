@@ -1,35 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/rango.dart';
+import 'package:provider/provider.dart';
 import '../models/cliente.dart';
+import '../models/rango.dart';
+import '../services/firestore_service.dart';
+import '../utils/constants.dart';
 import '../utils/formatters.dart';
 
-class MenudenciasForm extends StatefulWidget {
-  final List<Rango> rangos;
-  final List<Cliente> clientes;
-  final Future<void> Function({
-    required String rangoId,
-    required int canastillas,
-    required double peso,
-    String? clienteId,
-  }) onSubmit;
-  final String submitLabel;
+typedef OnSubmitMenudencias = Future<void> Function({
+  required String clienteId,
+  required String clienteNombre,
+  required String rangoId,
+  required String rangoNombre,
+  required int canastillas,
+  required double peso,
+});
 
+class MenudenciasForm extends StatefulWidget {
+  final OnSubmitMenudencias onSubmit;
+  final String submitLabel;
+  final String? initialClienteId;
   final String? initialRangoId;
   final int? initialCanastillas;
   final double? initialPeso;
-  final String? initialClienteId;
 
   const MenudenciasForm({
     super.key,
-    required this.rangos,
-    required this.clientes,
     required this.onSubmit,
     required this.submitLabel,
+    this.initialClienteId,
     this.initialRangoId,
     this.initialCanastillas,
     this.initialPeso,
-    this.initialClienteId,
   });
 
   @override
@@ -38,8 +40,9 @@ class MenudenciasForm extends StatefulWidget {
 
 class _MenudenciasFormState extends State<MenudenciasForm> {
   final _formKey = GlobalKey<FormState>();
-  String? _rangoId;
   String? _clienteId;
+  String? _rangoId;
+  Rango? _rangoObj;
   final _canastillasCtrl = TextEditingController();
   final _pesoCtrl = TextEditingController();
   bool _submitting = false;
@@ -47,8 +50,8 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
   @override
   void initState() {
     super.initState();
-    _rangoId = widget.initialRangoId;
     _clienteId = widget.initialClienteId;
+    _rangoId = widget.initialRangoId;
     if (widget.initialCanastillas != null) {
       _canastillasCtrl.text = widget.initialCanastillas.toString();
     }
@@ -64,14 +67,18 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(List<Cliente> clientes) async {
     if (!_formKey.currentState!.validate()) return;
+    if (_rangoObj == null || _clienteId == null) return;
+    final cliente = clientes.firstWhere((c) => c.id == _clienteId);
     setState(() => _submitting = true);
     await widget.onSubmit(
-      rangoId: _rangoId!,
+      clienteId: cliente.id,
+      clienteNombre: cliente.nombre,
+      rangoId: _rangoObj!.id,
+      rangoNombre: _rangoObj!.nombre,
       canastillas: int.parse(_canastillasCtrl.text),
       peso: double.parse(_pesoCtrl.text.replaceAll(',', '.')),
-      clienteId: _clienteId,
     );
     if (mounted) {
       setState(() {
@@ -87,43 +94,107 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final clientes = context.watch<List<Cliente>>();
+
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (widget.clientes.isNotEmpty) ...[
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Cliente',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.business),
-              ),
-              initialValue: _clienteId,
-              items: widget.clientes
-                  .map((c) =>
-                      DropdownMenuItem(value: c.id, child: Text(c.nombre)))
-                  .toList(),
-              onChanged: (v) => setState(() => _clienteId = v),
-              validator: (v) => v == null ? 'Selecciona un cliente' : null,
-            ),
-            const SizedBox(height: 12),
-          ],
+          // ── Cliente ──────────────────────────────────────────────────────
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(
-              labelText: 'Tipo de menudencia',
+              labelText: 'Cliente',
               border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.restaurant),
+              prefixIcon: Icon(Icons.business),
             ),
-            initialValue: _rangoId,
-            items: widget.rangos
-                .map((r) =>
-                    DropdownMenuItem(value: r.id, child: Text(r.nombre)))
+            // ignore: deprecated_member_use
+            value: clientes.any((c) => c.id == _clienteId) ? _clienteId : null,
+            items: clientes
+                .map((c) => DropdownMenuItem(value: c.id, child: Text(c.nombre)))
                 .toList(),
-            onChanged: (v) => setState(() => _rangoId = v),
-            validator: (v) => v == null ? 'Selecciona un tipo' : null,
+            onChanged: (v) => setState(() {
+              _clienteId = v;
+              _rangoId = null;
+              _rangoObj = null;
+            }),
+            validator: (v) => v == null ? 'Selecciona un cliente' : null,
           ),
           const SizedBox(height: 12),
+
+          // ── Tipo de menudencia (dinámico por cliente) ─────────────────────
+          if (_clienteId != null)
+            StreamBuilder<List<Rango>>(
+              stream: FirestoreService.instance.rangosStream(_clienteId!).map(
+                    (rs) => rs.where((r) => r.tipo == kTipoMenudencias).toList(),
+                  ),
+              builder: (ctx, snapshot) {
+                final rangos = snapshot.data ?? [];
+
+                if (_rangoId != null && _rangoObj == null && rangos.isNotEmpty) {
+                  final found =
+                      rangos.where((r) => r.id == _rangoId).firstOrNull;
+                  if (found != null) {
+                    Future.microtask(() {
+                      if (mounted) setState(() => _rangoObj = found);
+                    });
+                  }
+                }
+
+                final resolvedValue =
+                    rangos.any((r) => r.id == _rangoId) ? _rangoId : null;
+
+                return DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    labelText: 'Tipo de menudencia',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.restaurant),
+                    suffix: snapshot.connectionState == ConnectionState.waiting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : null,
+                  ),
+                  // ignore: deprecated_member_use
+                  value: resolvedValue,
+                  items: rangos
+                      .map((r) => DropdownMenuItem(
+                            value: r.id,
+                            child: Text(r.nombre),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    final sel = rangos.firstWhere((r) => r.id == v);
+                    setState(() {
+                      _rangoId = v;
+                      _rangoObj = sel;
+                    });
+                  },
+                  validator: (v) {
+                    if (_clienteId == null) return 'Primero selecciona un cliente';
+                    if (v == null) return 'Selecciona un tipo';
+                    return null;
+                  },
+                );
+              },
+            )
+          else
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Tipo de menudencia',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.restaurant),
+                hintText: 'Primero selecciona un cliente',
+              ),
+              items: const [],
+              onChanged: null,
+              validator: (_) =>
+                  _clienteId == null ? 'Primero selecciona un cliente' : null,
+            ),
+          const SizedBox(height: 12),
+
+          // ── Canastillas ───────────────────────────────────────────────────
           TextFormField(
             controller: _canastillasCtrl,
             keyboardType: TextInputType.number,
@@ -133,6 +204,7 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.shopping_basket),
             ),
+            onChanged: (_) => setState(() {}),
             validator: (v) {
               if (v == null || v.isEmpty) return 'Campo requerido';
               if ((int.tryParse(v) ?? 0) <= 0) return 'Debe ser mayor a 0';
@@ -140,6 +212,8 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
             },
           ),
           const SizedBox(height: 12),
+
+          // ── Peso ─────────────────────────────────────────────────────────
           TextFormField(
             controller: _pesoCtrl,
             keyboardType:
@@ -161,7 +235,8 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
             },
           ),
           const SizedBox(height: 8),
-          if (_rangoId != null &&
+
+          if (_rangoObj != null &&
               (int.tryParse(_canastillasCtrl.text) ?? 0) > 0)
             Container(
               padding:
@@ -178,8 +253,9 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
               ),
             ),
           const SizedBox(height: 16),
+
           FilledButton.icon(
-            onPressed: _submitting ? null : _submit,
+            onPressed: _submitting ? null : () => _submit(clientes),
             icon: _submitting
                 ? const SizedBox(
                     width: 16,

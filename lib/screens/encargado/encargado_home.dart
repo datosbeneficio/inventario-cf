@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/rangos_provider.dart';
-import '../../providers/ingresos_provider.dart';
-import '../../providers/clientes_provider.dart';
 import '../../models/ingreso.dart';
+import '../../models/cliente.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/firestore_service.dart';
 import '../../widgets/entrada_form.dart';
 import '../../widgets/movimiento_tile.dart';
 import '../../widgets/confirm_delete_dialog.dart';
 import '../../utils/formatters.dart';
+import '../../utils/constants.dart';
 
 class EncargadoHome extends StatelessWidget {
   const EncargadoHome({super.key});
@@ -36,20 +36,15 @@ class _EncargadoBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rangos = context.watch<RangosProvider>().activosAves;
-    final clientes = context.watch<ClientesProvider>().activos;
-    final ingresosProvider = context.watch<IngresosProvider>();
-    final hoy = ingresosProvider.porFecha(DateTime.now());
+    final todos = context.watch<List<Ingreso>>();
+    final hoy = _porFecha(todos, DateTime.now());
 
     return LayoutBuilder(
       builder: (ctx, constraints) {
         if (constraints.maxWidth >= 700) {
           return Row(
             children: [
-              SizedBox(
-                width: 380,
-                child: _FormPanel(rangos: rangos, clientes: clientes),
-              ),
+              SizedBox(width: 380, child: _FormPanel()),
               const VerticalDivider(width: 1),
               Expanded(child: _ListaIngresos(ingresos: hoy)),
             ],
@@ -59,7 +54,7 @@ class _EncargadoBody extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: _FormPanel(rangos: rangos, clientes: clientes),
+              child: _FormPanel(),
             ),
             const Divider(),
             Expanded(child: _ListaIngresos(ingresos: hoy)),
@@ -68,46 +63,58 @@ class _EncargadoBody extends StatelessWidget {
       },
     );
   }
+
+  List<Ingreso> _porFecha(List<Ingreso> todos, DateTime fecha) {
+    return todos
+        .where((i) =>
+            i.timestamp.year == fecha.year &&
+            i.timestamp.month == fecha.month &&
+            i.timestamp.day == fecha.day)
+        .toList();
+  }
 }
 
-class _FormPanel extends StatelessWidget {
-  final List rangos;
-  final List clientes;
-  const _FormPanel({required this.rangos, required this.clientes});
+// ── Formulario ────────────────────────────────────────────────────────────
 
+class _FormPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final provider = context.read<IngresosProvider>();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Registrar Ingreso',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Registrar Ingreso',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
           EntradaForm(
-            rangos: rangos.cast(),
-            clientes: clientes.cast(),
             submitLabel: 'Registrar Ingreso',
             onSubmit: ({
+              required clienteId,
+              required clienteNombre,
               required rangoId,
+              required rangoNombre,
               required inputValue,
               required peso,
               required esCola,
               required multiplicador,
-              clienteId,
             }) =>
-                provider.registrar(
+                FirestoreService.instance.addIngreso(
+              clienteId: clienteId,
+              clienteNombre: clienteNombre,
               rangoId: rangoId,
-              inputValue: inputValue,
+              rangoNombre: rangoNombre,
+              rangoTipo: kTipoAves,
+              canastillas: esCola ? 1 : inputValue,
               peso: peso,
               esCola: esCola,
-              multiplicador: multiplicador,
-              clienteId: clienteId,
+              unidades: FirestoreService.calcularUnidades(
+                  esCola, inputValue, multiplicador),
             ),
           ),
         ],
@@ -116,16 +123,14 @@ class _FormPanel extends StatelessWidget {
   }
 }
 
+// ── Lista de ingresos del día ─────────────────────────────────────────────
+
 class _ListaIngresos extends StatelessWidget {
   final List<Ingreso> ingresos;
   const _ListaIngresos({required this.ingresos});
 
   @override
   Widget build(BuildContext context) {
-    final rangosProvider = context.watch<RangosProvider>();
-    final clientesProvider = context.watch<ClientesProvider>();
-    final provider = context.read<IngresosProvider>();
-
     if (ingresos.isEmpty) {
       return const Center(child: Text('Sin ingresos hoy'));
     }
@@ -151,24 +156,25 @@ class _ListaIngresos extends StatelessWidget {
             itemCount: ingresos.length,
             itemBuilder: (ctx, i) {
               final ingreso = ingresos[i];
-              final rango = rangosProvider.porId(ingreso.rangoId);
-              final cliente = ingreso.clienteId != null
-                  ? clientesProvider.porId(ingreso.clienteId!)
-                  : null;
               return MovimientoTile(
-                rangoNombre: rango?.nombre ?? 'Rango eliminado',
-                clienteNombre: cliente?.nombre,
+                rangoNombre: ingreso.rangoNombre,
+                clienteNombre: ingreso.clienteNombre.isNotEmpty
+                    ? ingreso.clienteNombre
+                    : null,
                 unidades: ingreso.unidades,
                 peso: ingreso.peso,
                 esCola: ingreso.esCola,
                 canastillas: ingreso.canastillas,
                 timestamp: ingreso.timestamp,
-                onEdit: () => _showEditDialog(
-                    context, ingreso, rango?.multiplicador ?? 1),
+                onEdit: () => _showEditDialog(context, ingreso),
                 onDelete: () async {
-                  final ok = await showConfirmDelete(ctx,
-                      '${rango?.nombre ?? ''} - ${formatNum(ingreso.unidades)} unid.');
-                  if (ok) provider.eliminar(ingreso.id);
+                  final ok = await showConfirmDelete(
+                      ctx,
+                      '${ingreso.rangoNombre} — '
+                      '${formatNum(ingreso.unidades)} unid.');
+                  if (ok) {
+                    FirestoreService.instance.deleteIngreso(ingreso.id);
+                  }
                 },
               );
             },
@@ -178,10 +184,8 @@ class _ListaIngresos extends StatelessWidget {
     );
   }
 
-  void _showEditDialog(
-      BuildContext context, Ingreso ingreso, double multiplicador) {
-    final rangosProvider = context.read<RangosProvider>();
-    final clientesProvider = context.read<ClientesProvider>();
+  void _showEditDialog(BuildContext context, Ingreso ingreso) {
+    final clientes = context.read<List<Cliente>>();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -189,34 +193,37 @@ class _ListaIngresos extends StatelessWidget {
         content: SizedBox(
           width: 360,
           child: SingleChildScrollView(
-            child: EntradaForm(
-              rangos: rangosProvider.activosAves,
-              clientes: clientesProvider.activos,
-              submitLabel: 'Guardar cambios',
-              initialRangoId: ingreso.rangoId,
-              initialInputValue:
-                  ingreso.esCola ? ingreso.unidades : ingreso.canastillas,
-              initialPeso: ingreso.peso,
-              initialEsCola: ingreso.esCola,
-              initialClienteId: ingreso.clienteId,
-              onSubmit: ({
-                required rangoId,
-                required inputValue,
-                required peso,
-                required esCola,
-                required multiplicador,
-                clienteId,
-              }) async {
-                await context.read<IngresosProvider>().editar(
-                      ingreso.id,
-                      inputValue: inputValue,
-                      peso: peso,
-                      esCola: esCola,
-                      multiplicador: multiplicador,
-                      clienteId: clienteId,
-                    );
-                if (ctx.mounted) Navigator.pop(ctx);
-              },
+            child: Provider<List<Cliente>>.value(
+              value: clientes,
+              child: EntradaForm(
+                submitLabel: 'Guardar cambios',
+                initialClienteId: ingreso.clienteId,
+                initialRangoId: ingreso.rangoId,
+                initialInputValue:
+                    ingreso.esCola ? ingreso.unidades : ingreso.canastillas,
+                initialPeso: ingreso.peso,
+                initialEsCola: ingreso.esCola,
+                onSubmit: ({
+                  required clienteId,
+                  required clienteNombre,
+                  required rangoId,
+                  required rangoNombre,
+                  required inputValue,
+                  required peso,
+                  required esCola,
+                  required multiplicador,
+                }) async {
+                  await FirestoreService.instance.updateIngreso(
+                    ingreso.id,
+                    canastillas: esCola ? 1 : inputValue,
+                    peso: peso,
+                    esCola: esCola,
+                    unidades: FirestoreService.calcularUnidades(
+                        esCola, inputValue, multiplicador),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
             ),
           ),
         ),

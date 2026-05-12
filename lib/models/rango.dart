@@ -1,28 +1,35 @@
-import 'package:hive/hive.dart';
-part 'rango.g.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/constants.dart';
 
-@HiveType(typeId: 0)
-class Rango extends HiveObject {
-  @HiveField(0)
-  late String id;
+class Rango {
+  final String id;
+  final String clienteId;
+  final String nombre;
+  final double multiplicador;
+  final String tipo;
+  final bool activo;
 
-  @HiveField(1)
-  late String nombre;
+  const Rango({
+    required this.id,
+    required this.clienteId,
+    required this.nombre,
+    required this.multiplicador,
+    required this.tipo,
+    required this.activo,
+  });
 
-  @HiveField(2)
-  late double multiplicador;
+  bool get esAves => tipo == kTipoAves;
+  bool get esMenudencias => tipo == kTipoMenudencias;
 
-  @HiveField(3)
-  late bool activo;
-
-  @HiveField(4)
-  late DateTime creadoEn;
-
-  // Nullable for backward compat with existing records (defaults to 'aves')
-  @HiveField(5)
-  String? tipo;
-
-  String get tipoEfectivo => tipo ?? 'aves';
-  bool get esAves => tipoEfectivo == 'aves';
-  bool get esMenudencias => tipoEfectivo == 'menudencias';
+  factory Rango.fromDoc(String clienteId, DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return Rango(
+      id: doc.id,
+      clienteId: clienteId,
+      nombre: d['nombre'] ?? '',
+      multiplicador: (d['multiplicador'] ?? 1.0).toDouble(),
+      tipo: d['tipo'] ?? kTipoAves,
+      activo: d['activo'] ?? true,
+    );
+  }
 }

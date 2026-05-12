@@ -1,23 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/rangos_provider.dart';
-import '../../providers/ingresos_provider.dart';
-import '../../providers/clientes_provider.dart';
 import '../../models/ingreso.dart';
+import '../../models/cliente.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/firestore_service.dart';
 import '../../widgets/menudencias_form.dart';
 import '../../widgets/movimiento_tile.dart';
+import '../../widgets/inventario_panel.dart';
 import '../../widgets/confirm_delete_dialog.dart';
+import '../../utils/constants.dart';
 import '../../utils/formatters.dart';
 
-class SupervisorMenudenciasHome extends StatelessWidget {
+class SupervisorMenudenciasHome extends StatefulWidget {
   const SupervisorMenudenciasHome({super.key});
+
+  @override
+  State<SupervisorMenudenciasHome> createState() =>
+      _SupervisorMenudenciasHomeState();
+}
+
+class _SupervisorMenudenciasHomeState
+    extends State<SupervisorMenudenciasHome> {
+  int _tab = 0;
+
+  static const _titles = ['Inventario Menudencias', 'Registrar Ingreso'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Supervisor Menudencias'),
+        title: Text(_titles[_tab]),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -26,31 +38,46 @@ class SupervisorMenudenciasHome extends StatelessWidget {
           ),
         ],
       ),
-      body: const _Body(),
+      body: IndexedStack(
+        index: _tab,
+        children: const [
+          InventarioPanel(soloTipo: kTipoMenudencias),
+          _IngresoMenudBody(),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (i) => setState(() => _tab = i),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.inventory_2), label: 'Inventario'),
+          NavigationDestination(
+              icon: Icon(Icons.add_box), label: 'Registrar'),
+        ],
+      ),
     );
   }
 }
 
-class _Body extends StatelessWidget {
-  const _Body();
+// ── Pestaña registro de ingreso de menudencias ─────────────────────────────
+
+class _IngresoMenudBody extends StatelessWidget {
+  const _IngresoMenudBody();
 
   @override
   Widget build(BuildContext context) {
-    final rangos = context.watch<RangosProvider>().activosMenudencias;
-    final clientes = context.watch<ClientesProvider>().activos;
-    final ingresosProvider = context.watch<IngresosProvider>();
-
-    // Only show menudencias entries (rangos de menudencias)
-    final rangosMenudIds =
-        context.read<RangosProvider>().activosMenudencias.map((r) => r.id).toSet();
-    final hoy = ingresosProvider
-        .porFecha(DateTime.now())
-        .where((i) => rangosMenudIds.contains(i.rangoId))
+    final todos = context.watch<List<Ingreso>>();
+    final hoy = todos
+        .where((i) =>
+            i.rangoTipo == kTipoMenudencias &&
+            i.timestamp.year == DateTime.now().year &&
+            i.timestamp.month == DateTime.now().month &&
+            i.timestamp.day == DateTime.now().day)
         .toList();
 
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        final form = _FormPanel(rangos: rangos, clientes: clientes);
+        final form = _FormPanel();
         final list = _ListaIngresos(ingresos: hoy);
         if (constraints.maxWidth >= 700) {
           return Row(children: [
@@ -70,41 +97,41 @@ class _Body extends StatelessWidget {
 }
 
 class _FormPanel extends StatelessWidget {
-  final List rangos;
-  final List clientes;
-  const _FormPanel({required this.rangos, required this.clientes});
-
   @override
   Widget build(BuildContext context) {
-    final provider = context.read<IngresosProvider>();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Registrar Ingreso — Menudencias',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Registrar Ingreso — Menudencias',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
           MenudenciasForm(
-            rangos: rangos.cast(),
-            clientes: clientes.cast(),
             submitLabel: 'Registrar Ingreso',
             onSubmit: ({
+              required clienteId,
+              required clienteNombre,
               required rangoId,
+              required rangoNombre,
               required canastillas,
               required peso,
-              clienteId,
             }) =>
-                provider.registrar(
+                FirestoreService.instance.addIngreso(
+              clienteId: clienteId,
+              clienteNombre: clienteNombre,
               rangoId: rangoId,
-              inputValue: canastillas,
+              rangoNombre: rangoNombre,
+              rangoTipo: kTipoMenudencias,
+              canastillas: canastillas,
               peso: peso,
               esCola: false,
-              multiplicador: 1,
-              clienteId: clienteId,
+              unidades: canastillas,
             ),
           ),
         ],
@@ -113,21 +140,19 @@ class _FormPanel extends StatelessWidget {
   }
 }
 
+// ── Lista de ingresos del día ─────────────────────────────────────────────
+
 class _ListaIngresos extends StatelessWidget {
   final List<Ingreso> ingresos;
   const _ListaIngresos({required this.ingresos});
 
   @override
   Widget build(BuildContext context) {
-    final rangosProvider = context.watch<RangosProvider>();
-    final clientesProvider = context.watch<ClientesProvider>();
-    final provider = context.read<IngresosProvider>();
-
     if (ingresos.isEmpty) {
       return const Center(child: Text('Sin ingresos de menudencias hoy'));
     }
 
-    final totalCanastillas = ingresos.fold(0, (s, i) => s + i.canastillas);
+    final totalCan = ingresos.fold(0, (s, i) => s + i.canastillas);
     final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
 
     return Column(
@@ -142,7 +167,7 @@ class _ListaIngresos extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${formatNum(totalCanastillas)} canastillas',
+                  Text('${formatNum(totalCan)} canastillas',
                       style: const TextStyle(fontSize: 12)),
                   Text(formatKg(totalPeso),
                       style: const TextStyle(fontSize: 12)),
@@ -156,13 +181,11 @@ class _ListaIngresos extends StatelessWidget {
             itemCount: ingresos.length,
             itemBuilder: (ctx, i) {
               final ingreso = ingresos[i];
-              final rango = rangosProvider.porId(ingreso.rangoId);
-              final cliente = ingreso.clienteId != null
-                  ? clientesProvider.porId(ingreso.clienteId!)
-                  : null;
               return MovimientoTile(
-                rangoNombre: rango?.nombre ?? 'Rango eliminado',
-                clienteNombre: cliente?.nombre,
+                rangoNombre: ingreso.rangoNombre,
+                clienteNombre: ingreso.clienteNombre.isNotEmpty
+                    ? ingreso.clienteNombre
+                    : null,
                 unidades: ingreso.canastillas,
                 peso: ingreso.peso,
                 esCola: false,
@@ -170,9 +193,11 @@ class _ListaIngresos extends StatelessWidget {
                 timestamp: ingreso.timestamp,
                 onEdit: () => _showEditDialog(context, ingreso),
                 onDelete: () async {
-                  final ok = await showConfirmDelete(ctx,
-                      '${rango?.nombre ?? ''} - ${formatNum(ingreso.canastillas)} canastillas');
-                  if (ok) provider.eliminar(ingreso.id);
+                  final ok = await showConfirmDelete(
+                      ctx,
+                      '${ingreso.rangoNombre} — '
+                      '${formatNum(ingreso.canastillas)} canastillas');
+                  if (ok) FirestoreService.instance.deleteIngreso(ingreso.id);
                 },
               );
             },
@@ -183,8 +208,7 @@ class _ListaIngresos extends StatelessWidget {
   }
 
   void _showEditDialog(BuildContext context, Ingreso ingreso) {
-    final rangosProvider = context.read<RangosProvider>();
-    final clientesProvider = context.read<ClientesProvider>();
+    final clientes = context.read<List<Cliente>>();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -192,30 +216,32 @@ class _ListaIngresos extends StatelessWidget {
         content: SizedBox(
           width: 360,
           child: SingleChildScrollView(
-            child: MenudenciasForm(
-              rangos: rangosProvider.activosMenudencias,
-              clientes: clientesProvider.activos,
-              submitLabel: 'Guardar cambios',
-              initialRangoId: ingreso.rangoId,
-              initialCanastillas: ingreso.canastillas,
-              initialPeso: ingreso.peso,
-              initialClienteId: ingreso.clienteId,
-              onSubmit: ({
-                required rangoId,
-                required canastillas,
-                required peso,
-                clienteId,
-              }) async {
-                await context.read<IngresosProvider>().editar(
-                      ingreso.id,
-                      inputValue: canastillas,
-                      peso: peso,
-                      esCola: false,
-                      multiplicador: 1,
-                      clienteId: clienteId,
-                    );
-                if (ctx.mounted) Navigator.pop(ctx);
-              },
+            child: Provider<List<Cliente>>.value(
+              value: clientes,
+              child: MenudenciasForm(
+                submitLabel: 'Guardar cambios',
+                initialClienteId: ingreso.clienteId,
+                initialRangoId: ingreso.rangoId,
+                initialCanastillas: ingreso.canastillas,
+                initialPeso: ingreso.peso,
+                onSubmit: ({
+                  required clienteId,
+                  required clienteNombre,
+                  required rangoId,
+                  required rangoNombre,
+                  required canastillas,
+                  required peso,
+                }) async {
+                  await FirestoreService.instance.updateIngreso(
+                    ingreso.id,
+                    canastillas: canastillas,
+                    peso: peso,
+                    esCola: false,
+                    unidades: canastillas,
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
             ),
           ),
         ),

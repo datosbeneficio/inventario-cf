@@ -1,9 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/rangos_provider.dart';
-import '../../providers/ingresos_provider.dart';
-import '../../providers/salidas_provider.dart';
+import '../../models/ingreso.dart';
+import '../../models/salida.dart';
 import '../../utils/constants.dart';
 import '../../utils/formatters.dart';
 
@@ -35,10 +34,18 @@ class _ReporteRendimientoScreenState extends State<ReporteRendimientoScreen>
 
   @override
   Widget build(BuildContext context) {
-    final rangosAves = context.watch<RangosProvider>().activosAves;
-    final rangosMenud = context.watch<RangosProvider>().activosMenudencias;
-    final ingresosP = context.watch<IngresosProvider>();
-    final salidasP = context.watch<SalidasProvider>();
+    final todos = context.watch<List<Ingreso>>();
+    final todasSalidas = context.watch<List<Salida>>();
+
+    final toEnd = _to.add(const Duration(days: 1));
+    final ingresosRango = todos
+        .where((i) =>
+            !i.timestamp.isBefore(_from) && i.timestamp.isBefore(toEnd))
+        .toList();
+    final salidasRango = todasSalidas
+        .where((s) =>
+            !s.timestamp.isBefore(_from) && s.timestamp.isBefore(toEnd))
+        .toList();
 
     return Scaffold(
       body: Column(
@@ -63,20 +70,22 @@ class _ReporteRendimientoScreenState extends State<ReporteRendimientoScreen>
               controller: _tab,
               children: [
                 _RendimientoView(
-                  rangos: rangosAves,
                   tipo: kTipoAves,
-                  from: _from,
-                  to: _to,
-                  ingresosP: ingresosP,
-                  salidasP: salidasP,
+                  ingresos: ingresosRango
+                      .where((i) => i.rangoTipo == kTipoAves)
+                      .toList(),
+                  salidas: salidasRango
+                      .where((s) => s.rangoTipo == kTipoAves)
+                      .toList(),
                 ),
                 _RendimientoView(
-                  rangos: rangosMenud,
                   tipo: kTipoMenudencias,
-                  from: _from,
-                  to: _to,
-                  ingresosP: ingresosP,
-                  salidasP: salidasP,
+                  ingresos: ingresosRango
+                      .where((i) => i.rangoTipo == kTipoMenudencias)
+                      .toList(),
+                  salidas: salidasRango
+                      .where((s) => s.rangoTipo == kTipoMenudencias)
+                      .toList(),
                 ),
               ],
             ),
@@ -102,40 +111,42 @@ class _ReporteRendimientoScreenState extends State<ReporteRendimientoScreen>
   }
 }
 
+// ── Vista de rendimiento por tipo ──────────────────────────────────────────
+
 class _RendimientoView extends StatelessWidget {
-  final List rangos;
   final String tipo;
-  final DateTime from;
-  final DateTime to;
-  final IngresosProvider ingresosP;
-  final SalidasProvider salidasP;
+  final List<Ingreso> ingresos;
+  final List<Salida> salidas;
 
   const _RendimientoView({
-    required this.rangos,
     required this.tipo,
-    required this.from,
-    required this.to,
-    required this.ingresosP,
-    required this.salidasP,
+    required this.ingresos,
+    required this.salidas,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (rangos.isEmpty) {
-      return const Center(child: Text('Sin rangos configurados'));
+    if (ingresos.isEmpty && salidas.isEmpty) {
+      return const Center(
+          child: Text('Sin movimientos en este período'));
     }
 
-    final rows = rangos.map((rango) {
-      final ingresos =
-          ingresosP.enRango(from, to).where((i) => i.rangoId == rango.id);
-      final salidas =
-          salidasP.enRango(from, to).where((s) => s.rangoId == rango.id);
-      final pesoIn = ingresos.fold(0.0, (s, e) => s + e.peso);
-      final pesoOut = salidas.fold(0.0, (s, e) => s + e.peso);
+    // Agrupar por rangoNombre (campo denormalizado)
+    final nombres = <String>{
+      ...ingresos.map((i) => i.rangoNombre),
+      ...salidas.map((s) => s.rangoNombre),
+    }.toList()
+      ..sort();
+
+    final rows = nombres.map((nombre) {
+      final ing = ingresos.where((i) => i.rangoNombre == nombre);
+      final sal = salidas.where((s) => s.rangoNombre == nombre);
+      final pesoIn = ing.fold(0.0, (s, e) => s + e.peso);
+      final pesoOut = sal.fold(0.0, (s, e) => s + e.peso);
       final mermaKg = pesoIn - pesoOut;
       final mermaP = pesoIn > 0 ? (mermaKg / pesoIn) * 100 : 0.0;
       return _RendRow(
-        nombre: rango.nombre,
+        nombre: nombre,
         pesoIn: pesoIn,
         pesoOut: pesoOut,
         mermaKg: mermaKg,
@@ -157,7 +168,7 @@ class _RendimientoView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Summary row
+          // Resumen
           Row(
             children: [
               _SummaryCard(
@@ -183,7 +194,7 @@ class _RendimientoView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          // Bar chart — peso ingresado vs peso salido
+          // Gráfico
           if (rows.any((r) => r.pesoIn > 0 || r.pesoOut > 0)) ...[
             Text('Peso por rango (kg)',
                 style: Theme.of(context).textTheme.titleSmall),
@@ -209,7 +220,7 @@ class _RendimientoView extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
-          // Table
+          // Tabla
           Text('Detalle por rango',
               style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 4),
@@ -240,17 +251,17 @@ class _RendimientoView extends StatelessWidget {
                     const DataCell(Text('TOTAL',
                         style: TextStyle(fontWeight: FontWeight.bold))),
                     DataCell(Text(formatNum(totalPesoIn),
-                        style:
-                            const TextStyle(fontWeight: FontWeight.bold))),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold))),
                     DataCell(Text(formatNum(totalPesoOut),
-                        style:
-                            const TextStyle(fontWeight: FontWeight.bold))),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold))),
                     DataCell(Text(formatNum(totalMermaKg),
-                        style:
-                            const TextStyle(fontWeight: FontWeight.bold))),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold))),
                     DataCell(Text('${formatNum(totalMermaP)}%',
-                        style:
-                            const TextStyle(fontWeight: FontWeight.bold))),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold))),
                   ],
                 ),
               ],
@@ -261,6 +272,8 @@ class _RendimientoView extends StatelessWidget {
     );
   }
 }
+
+// ── Bar chart ──────────────────────────────────────────────────────────────
 
 class _PesoBarChart extends StatelessWidget {
   final List<_RendRow> rows;
@@ -356,6 +369,8 @@ class _PesoBarChart extends StatelessWidget {
     );
   }
 }
+
+// ── Modelos y helpers de UI ────────────────────────────────────────────────
 
 class _RendRow {
   final String nombre;

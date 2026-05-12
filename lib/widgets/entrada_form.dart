@@ -1,40 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/rango.dart';
+import 'package:provider/provider.dart';
 import '../models/cliente.dart';
-import '../providers/ingresos_provider.dart';
+import '../models/rango.dart';
+import '../services/firestore_service.dart';
+import '../utils/constants.dart';
 import '../utils/formatters.dart';
 
-class EntradaForm extends StatefulWidget {
-  final List<Rango> rangos;
-  final List<Cliente> clientes;
-  final Future<void> Function({
-    required String rangoId,
-    required int inputValue,
-    required double peso,
-    required bool esCola,
-    required double multiplicador,
-    String? clienteId,
-  }) onSubmit;
-  final String submitLabel;
+typedef OnSubmitEntrada = Future<void> Function({
+  required String clienteId,
+  required String clienteNombre,
+  required String rangoId,
+  required String rangoNombre,
+  required int inputValue,
+  required double peso,
+  required bool esCola,
+  required double multiplicador,
+});
 
+class EntradaForm extends StatefulWidget {
+  final OnSubmitEntrada onSubmit;
+  final String submitLabel;
+  final String? initialClienteId;
   final String? initialRangoId;
   final int? initialInputValue;
   final double? initialPeso;
   final bool? initialEsCola;
-  final String? initialClienteId;
 
   const EntradaForm({
     super.key,
-    required this.rangos,
     required this.onSubmit,
     required this.submitLabel,
-    this.clientes = const [],
+    this.initialClienteId,
     this.initialRangoId,
     this.initialInputValue,
     this.initialPeso,
     this.initialEsCola,
-    this.initialClienteId,
   });
 
   @override
@@ -43,71 +44,63 @@ class EntradaForm extends StatefulWidget {
 
 class _EntradaFormState extends State<EntradaForm> {
   final _formKey = GlobalKey<FormState>();
-  String? _rangoId;
   String? _clienteId;
-  final _inputController = TextEditingController();
-  final _pesoController = TextEditingController();
+  String? _rangoId;
+  Rango? _rangoObj;
+  final _inputCtrl = TextEditingController();
+  final _pesoCtrl = TextEditingController();
   bool _esCola = false;
   bool _submitting = false;
 
-  Rango? get _rangoSeleccionado {
-    if (_rangoId == null) return null;
-    try {
-      return widget.rangos.firstWhere((r) => r.id == _rangoId);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  int get _inputValue => int.tryParse(_inputController.text) ?? 0;
+  int get _inputValue => int.tryParse(_inputCtrl.text) ?? 0;
 
   int get _preview {
-    final rango = _rangoSeleccionado;
-    if (rango == null) return 0;
-    return IngresosProvider.calcularUnidades(
-        _esCola, _inputValue, rango.multiplicador);
+    final mult = _rangoObj?.multiplicador ?? 1.0;
+    return FirestoreService.calcularUnidades(_esCola, _inputValue, mult);
   }
 
   @override
   void initState() {
     super.initState();
-    _rangoId = widget.initialRangoId;
     _clienteId = widget.initialClienteId;
+    _rangoId = widget.initialRangoId;
     _esCola = widget.initialEsCola ?? false;
     if (widget.initialInputValue != null) {
-      _inputController.text = widget.initialInputValue.toString();
+      _inputCtrl.text = widget.initialInputValue.toString();
     }
     if (widget.initialPeso != null) {
-      _pesoController.text = widget.initialPeso.toString();
+      _pesoCtrl.text = widget.initialPeso.toString();
     }
   }
 
   @override
   void dispose() {
-    _inputController.dispose();
-    _pesoController.dispose();
+    _inputCtrl.dispose();
+    _pesoCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(List<Cliente> clientes) async {
     if (!_formKey.currentState!.validate()) return;
-    final rango = _rangoSeleccionado;
-    if (rango == null) return;
+    if (_rangoObj == null || _clienteId == null) return;
+    final cliente = clientes.firstWhere((c) => c.id == _clienteId);
     setState(() => _submitting = true);
     await widget.onSubmit(
-      rangoId: rango.id,
+      clienteId: cliente.id,
+      clienteNombre: cliente.nombre,
+      rangoId: _rangoObj!.id,
+      rangoNombre: _rangoObj!.nombre,
       inputValue: _inputValue,
-      peso: double.parse(_pesoController.text.replaceAll(',', '.')),
+      peso: double.parse(_pesoCtrl.text.replaceAll(',', '.')),
       esCola: _esCola,
-      multiplicador: rango.multiplicador,
-      clienteId: _clienteId,
+      multiplicador: _rangoObj!.multiplicador,
     );
     if (mounted) {
       setState(() {
         _submitting = false;
         if (widget.initialRangoId == null) {
-          _inputController.clear();
-          _pesoController.clear();
+          _inputCtrl.clear();
+          _pesoCtrl.clear();
           _esCola = false;
         }
       });
@@ -117,45 +110,110 @@ class _EntradaFormState extends State<EntradaForm> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final clientes = context.watch<List<Cliente>>();
+
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Cliente selector (only if clientes list provided)
-          if (widget.clientes.isNotEmpty) ...[
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Cliente',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.business),
-              ),
-              initialValue: _clienteId,
-              items: widget.clientes
-                  .map((c) => DropdownMenuItem(value: c.id, child: Text(c.nombre)))
-                  .toList(),
-              onChanged: (v) => setState(() => _clienteId = v),
-              validator: (v) => v == null ? 'Selecciona un cliente' : null,
-            ),
-            const SizedBox(height: 12),
-          ],
+          // ── Cliente ──────────────────────────────────────────────────────
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(
-              labelText: 'Rango',
+              labelText: 'Cliente',
               border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.category),
+              prefixIcon: Icon(Icons.business),
             ),
-            initialValue: _rangoId,
-            items: widget.rangos
-                .map((r) => DropdownMenuItem(
-                      value: r.id,
-                      child: Text('${r.nombre} (×${formatNum(r.multiplicador)})'),
-                    ))
+            // ignore: deprecated_member_use
+            value: clientes.any((c) => c.id == _clienteId) ? _clienteId : null,
+            items: clientes
+                .map((c) => DropdownMenuItem(value: c.id, child: Text(c.nombre)))
                 .toList(),
-            onChanged: (v) => setState(() => _rangoId = v),
-            validator: (v) => v == null ? 'Selecciona un rango' : null,
+            onChanged: (v) => setState(() {
+              _clienteId = v;
+              _rangoId = null;
+              _rangoObj = null;
+            }),
+            validator: (v) => v == null ? 'Selecciona un cliente' : null,
           ),
           const SizedBox(height: 12),
+
+          // ── Rango (dinámico por cliente) ─────────────────────────────────
+          if (_clienteId != null)
+            StreamBuilder<List<Rango>>(
+              stream: FirestoreService.instance.rangosStream(_clienteId!).map(
+                    (rs) => rs.where((r) => r.tipo == kTipoAves).toList(),
+                  ),
+              builder: (ctx, snapshot) {
+                final rangos = snapshot.data ?? [];
+
+                // Resolve initial rango object when stream first arrives
+                if (_rangoId != null && _rangoObj == null && rangos.isNotEmpty) {
+                  final found =
+                      rangos.where((r) => r.id == _rangoId).firstOrNull;
+                  if (found != null) {
+                    Future.microtask(() {
+                      if (mounted) setState(() => _rangoObj = found);
+                    });
+                  }
+                }
+
+                final resolvedValue =
+                    rangos.any((r) => r.id == _rangoId) ? _rangoId : null;
+
+                return DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    labelText: 'Rango (aves)',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.category),
+                    suffix: snapshot.connectionState == ConnectionState.waiting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2))
+                        : null,
+                  ),
+                  // ignore: deprecated_member_use
+                  value: resolvedValue,
+                  items: rangos
+                      .map((r) => DropdownMenuItem(
+                            value: r.id,
+                            child: Text(
+                                '${r.nombre} (×${formatNum(r.multiplicador)})'),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    final sel = rangos.firstWhere((r) => r.id == v);
+                    setState(() {
+                      _rangoId = v;
+                      _rangoObj = sel;
+                    });
+                  },
+                  validator: (v) {
+                    if (_clienteId == null) return 'Primero selecciona un cliente';
+                    if (v == null) return 'Selecciona un rango';
+                    return null;
+                  },
+                );
+              },
+            )
+          else
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'Rango (aves)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.category),
+                hintText: 'Primero selecciona un cliente',
+              ),
+              items: const [],
+              onChanged: null,
+              validator: (_) =>
+                  _clienteId == null ? 'Primero selecciona un cliente' : null,
+            ),
+          const SizedBox(height: 12),
+
+          // ── Cola toggle ──────────────────────────────────────────────────
           SwitchListTile(
             title: const Text('Tipo Cola'),
             subtitle: Text(_esCola
@@ -164,18 +222,20 @@ class _EntradaFormState extends State<EntradaForm> {
             value: _esCola,
             onChanged: (v) => setState(() {
               _esCola = v;
-              _inputController.clear();
+              _inputCtrl.clear();
             }),
-            tileColor: _esCola
-                ? cs.tertiaryContainer.withValues(alpha: 0.3)
-                : null,
+            tileColor:
+                _esCola ? cs.tertiaryContainer.withValues(alpha: 0.3) : null,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: cs.outlineVariant)),
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(color: cs.outlineVariant),
+            ),
           ),
           const SizedBox(height: 12),
+
+          // ── Canastillas / Unidades ───────────────────────────────────────
           TextFormField(
-            controller: _inputController,
+            controller: _inputCtrl,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: InputDecoration(
@@ -192,8 +252,10 @@ class _EntradaFormState extends State<EntradaForm> {
             },
           ),
           const SizedBox(height: 12),
+
+          // ── Peso ─────────────────────────────────────────────────────────
           TextFormField(
-            controller: _pesoController,
+            controller: _pesoCtrl,
             keyboardType:
                 const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
@@ -213,7 +275,9 @@ class _EntradaFormState extends State<EntradaForm> {
             },
           ),
           const SizedBox(height: 8),
-          if (_rangoSeleccionado != null && _inputValue > 0)
+
+          // ── Preview ──────────────────────────────────────────────────────
+          if (_rangoObj != null && _inputValue > 0)
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -229,8 +293,9 @@ class _EntradaFormState extends State<EntradaForm> {
               ),
             ),
           const SizedBox(height: 16),
+
           FilledButton.icon(
-            onPressed: _submitting ? null : _submit,
+            onPressed: _submitting ? null : () => _submit(clientes),
             icon: _submitting
                 ? const SizedBox(
                     width: 16,

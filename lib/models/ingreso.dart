@@ -1,29 +1,61 @@
-import 'package:hive/hive.dart';
-part 'ingreso.g.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-@HiveType(typeId: 1)
-class Ingreso extends HiveObject {
-  @HiveField(0)
-  late String id;
+class Ingreso {
+  final String id;
+  final String clienteId;
+  final String clienteNombre;
+  final String rangoId;
+  final String rangoNombre;
+  final String rangoTipo;
+  final int canastillas;
+  final double peso;
+  final bool esCola;
+  final int unidades;
+  final DateTime timestamp;
 
-  @HiveField(1)
-  late String rangoId;
+  const Ingreso({
+    required this.id,
+    required this.clienteId,
+    required this.clienteNombre,
+    required this.rangoId,
+    required this.rangoNombre,
+    required this.rangoTipo,
+    required this.canastillas,
+    required this.peso,
+    required this.esCola,
+    required this.unidades,
+    required this.timestamp,
+  });
 
-  @HiveField(2)
-  late int canastillas;
+  factory Ingreso.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return Ingreso(
+      id: doc.id,
+      clienteId: d['clienteId'] ?? '',
+      clienteNombre: d['clienteNombre'] ?? '',
+      rangoId: d['rangoId'] ?? '',
+      rangoNombre: d['rangoNombre'] ?? '',
+      rangoTipo: d['rangoTipo'] ?? 'aves',
+      canastillas: d['canastillas'] ?? 0,
+      peso: (d['peso'] ?? 0.0).toDouble(),
+      esCola: d['esCola'] ?? false,
+      unidades: d['unidades'] ?? 0,
+      timestamp: d['timestamp'] != null
+          ? (d['timestamp'] as Timestamp).toDate()
+          : DateTime.now(),
+    );
+  }
 
-  @HiveField(3)
-  late double peso;
-
-  @HiveField(4)
-  late bool esCola;
-
-  @HiveField(5)
-  late int unidades;
-
-  @HiveField(6)
-  late DateTime timestamp;
-
-  @HiveField(7)
-  String? clienteId;
+  Map<String, dynamic> toMap() => {
+        'clienteId': clienteId,
+        'clienteNombre': clienteNombre,
+        'rangoId': rangoId,
+        'rangoNombre': rangoNombre,
+        'rangoTipo': rangoTipo,
+        'canastillas': canastillas,
+        'peso': peso,
+        'esCola': esCola,
+        'unidades': unidades,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
 }
