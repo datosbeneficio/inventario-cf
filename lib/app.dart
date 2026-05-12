@@ -1,0 +1,42 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'providers/auth_provider.dart';
+import 'utils/constants.dart';
+import 'screens/login_screen.dart';
+import 'screens/coordinador/coordinador_home.dart';
+import 'screens/encargado/encargado_home.dart';
+import 'screens/supervisor/supervisor_home.dart';
+
+class InventarioCfApp extends StatelessWidget {
+  const InventarioCfApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Inventario CF',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1565C0),
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 2,
+        ),
+      ),
+      home: Consumer<AuthProvider>(
+        builder: (ctx, auth, _) {
+          if (!auth.isLoggedIn) return const LoginScreen();
+          return switch (auth.role) {
+            kRolCoordinador => const CoordinadorHome(),
+            kRolEncargado => const EncargadoHome(),
+            kRolSupervisor => const SupervisorHome(),
+            _ => const LoginScreen(),
+          };
+        },
+      ),
+    );
+  }
+}
