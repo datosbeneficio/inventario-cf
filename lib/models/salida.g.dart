@@ -23,13 +23,14 @@ class SalidaAdapter extends TypeAdapter<Salida> {
       ..peso = fields[3] as double
       ..esCola = fields[4] as bool
       ..unidades = fields[5] as int
-      ..timestamp = fields[6] as DateTime;
+      ..timestamp = fields[6] as DateTime
+      ..clienteId = fields[7] as String?;
   }
 
   @override
   void write(BinaryWriter writer, Salida obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -43,7 +44,9 @@ class SalidaAdapter extends TypeAdapter<Salida> {
       ..writeByte(5)
       ..write(obj.unidades)
       ..writeByte(6)
-      ..write(obj.timestamp);
+      ..write(obj.timestamp)
+      ..writeByte(7)
+      ..write(obj.clienteId);
   }
 
   @override

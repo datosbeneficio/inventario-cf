@@ -17,4 +17,12 @@ class Rango extends HiveObject {
 
   @HiveField(4)
   late DateTime creadoEn;
+
+  // Nullable for backward compat with existing records (defaults to 'aves')
+  @HiveField(5)
+  String? tipo;
+
+  String get tipoEfectivo => tipo ?? 'aves';
+  bool get esAves => tipoEfectivo == 'aves';
+  bool get esMenudencias => tipoEfectivo == 'menudencias';
 }

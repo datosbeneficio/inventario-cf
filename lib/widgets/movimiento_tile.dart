@@ -3,6 +3,7 @@ import '../utils/formatters.dart';
 
 class MovimientoTile extends StatelessWidget {
   final String rangoNombre;
+  final String? clienteNombre;
   final int unidades;
   final double peso;
   final bool esCola;
@@ -21,6 +22,7 @@ class MovimientoTile extends StatelessWidget {
     required this.timestamp,
     required this.onEdit,
     required this.onDelete,
+    this.clienteNombre,
   });
 
   @override
@@ -30,22 +32,43 @@ class MovimientoTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: esCola ? cs.tertiaryContainer : cs.primaryContainer,
+          backgroundColor:
+              esCola ? cs.tertiaryContainer : cs.primaryContainer,
           child: Text(
             esCola ? 'C' : '${canastillas}c',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: esCola ? cs.onTertiaryContainer : cs.onPrimaryContainer,
+              color: esCola
+                  ? cs.onTertiaryContainer
+                  : cs.onPrimaryContainer,
             ),
           ),
         ),
-        title: Text(
-          rangoNombre,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(rangoNombre,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            if (clienteNombre != null)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.secondaryContainer,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  clienteNombre!,
+                  style: TextStyle(
+                      fontSize: 11, color: cs.onSecondaryContainer),
+                ),
+              ),
+          ],
         ),
         subtitle: Text(
-          '${formatNum(unidades)} unid. · ${formatKg(peso)}  ${esCola ? '· COLA' : ''}',
+          '${formatNum(unidades)} unid. · ${formatKg(peso)}${esCola ? ' · COLA' : ''}',
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -60,7 +83,8 @@ class MovimientoTile extends StatelessWidget {
               tooltip: 'Editar',
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+              icon: const Icon(Icons.delete_outline,
+                  size: 20, color: Colors.red),
               onPressed: onDelete,
               tooltip: 'Eliminar',
             ),

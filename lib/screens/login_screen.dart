@@ -19,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
     {'value': kRolCoordinador, 'label': 'Coordinador Proceso'},
     {'value': kRolEncargado, 'label': 'Encargado Cuarto Frío'},
     {'value': kRolSupervisor, 'label': 'Supervisor Despacho'},
+    {'value': kRolSupervisorMenudencias, 'label': 'Supervisor Menudencias'},
   ];
 
   @override
@@ -40,8 +41,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
   @override
@@ -56,7 +57,8 @@ class _LoginScreenState extends State<LoginScreen> {
             constraints: const BoxConstraints(maxWidth: 400),
             child: Card(
               elevation: 8,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(32),
                 child: Column(
@@ -69,14 +71,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: Theme.of(context)
                           .textTheme
                           .headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold, color: cs.primary),
+                          ?.copyWith(
+                              fontWeight: FontWeight.bold, color: cs.primary),
                     ),
                     Text(
-                      'Inventario de Aves',
+                      'Inventario de Aves y Menudencias',
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium
                           ?.copyWith(color: cs.onSurfaceVariant),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
                     DropdownButtonFormField<String>(
@@ -103,8 +107,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscure = !_obscure),
+                          icon: Icon(_obscure
+                              ? Icons.visibility
+                              : Icons.visibility_off),
+                          onPressed: () =>
+                              setState(() => _obscure = !_obscure),
                         ),
                       ),
                       onFieldSubmitted: (_) => _login(),

@@ -23,4 +23,7 @@ class Ingreso extends HiveObject {
 
   @HiveField(6)
   late DateTime timestamp;
+
+  @HiveField(7)
+  String? clienteId;
 }

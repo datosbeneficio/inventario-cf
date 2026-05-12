@@ -6,6 +6,7 @@ import 'screens/login_screen.dart';
 import 'screens/coordinador/coordinador_home.dart';
 import 'screens/encargado/encargado_home.dart';
 import 'screens/supervisor/supervisor_home.dart';
+import 'screens/supervisor_menudencias/supervisor_menudencias_home.dart';
 
 class InventarioCfApp extends StatelessWidget {
   const InventarioCfApp({super.key});
@@ -33,6 +34,7 @@ class InventarioCfApp extends StatelessWidget {
             kRolCoordinador => const CoordinadorHome(),
             kRolEncargado => const EncargadoHome(),
             kRolSupervisor => const SupervisorHome(),
+            kRolSupervisorMenudencias => const SupervisorMenudenciasHome(),
             _ => const LoginScreen(),
           };
         },

@@ -21,6 +21,7 @@ class IngresosProvider extends ChangeNotifier {
     required double peso,
     required bool esCola,
     required double multiplicador,
+    String? clienteId,
   }) async {
     final unidades = calcularUnidades(esCola, inputValue, multiplicador);
     final ingreso = Ingreso()
@@ -30,7 +31,8 @@ class IngresosProvider extends ChangeNotifier {
       ..peso = peso
       ..esCola = esCola
       ..unidades = unidades
-      ..timestamp = DateTime.now();
+      ..timestamp = DateTime.now()
+      ..clienteId = clienteId;
     await _box.put(ingreso.id, ingreso);
     notifyListeners();
   }
@@ -41,6 +43,7 @@ class IngresosProvider extends ChangeNotifier {
     required double peso,
     required bool esCola,
     required double multiplicador,
+    String? clienteId,
   }) async {
     final ingreso = _box.get(id);
     if (ingreso == null) return;
@@ -48,7 +51,8 @@ class IngresosProvider extends ChangeNotifier {
       ..canastillas = esCola ? 1 : inputValue
       ..peso = peso
       ..esCola = esCola
-      ..unidades = calcularUnidades(esCola, inputValue, multiplicador);
+      ..unidades = calcularUnidades(esCola, inputValue, multiplicador)
+      ..clienteId = clienteId;
     await ingreso.save();
     notifyListeners();
   }
@@ -65,11 +69,8 @@ class IngresosProvider extends ChangeNotifier {
   List<Ingreso> porRango(String rangoId) =>
       all.where((i) => i.rangoId == rangoId).toList();
 
-  List<Ingreso> porRangoYRango(DateTime from, DateTime to, String rangoId) =>
-      all
-          .where((i) =>
-              i.rangoId == rangoId && isInRange(i.timestamp, from, to))
-          .toList();
+  List<Ingreso> porCliente(String clienteId) =>
+      all.where((i) => i.clienteId == clienteId).toList();
 
   List<Ingreso> enRango(DateTime from, DateTime to) =>
       all.where((i) => isInRange(i.timestamp, from, to)).toList();

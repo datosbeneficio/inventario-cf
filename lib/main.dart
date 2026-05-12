@@ -5,6 +5,7 @@ import 'providers/auth_provider.dart';
 import 'providers/rangos_provider.dart';
 import 'providers/ingresos_provider.dart';
 import 'providers/salidas_provider.dart';
+import 'providers/clientes_provider.dart';
 import 'app.dart';
 
 void main() async {
@@ -17,6 +18,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => RangosProvider()),
         ChangeNotifierProvider(create: (_) => IngresosProvider()),
         ChangeNotifierProvider(create: (_) => SalidasProvider()),
+        ChangeNotifierProvider(create: (_) => ClientesProvider()),
       ],
       child: const InventarioCfApp(),
     ),

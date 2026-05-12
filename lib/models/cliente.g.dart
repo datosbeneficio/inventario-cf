@@ -1,46 +1,40 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'rango.dart';
+part of 'cliente.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class RangoAdapter extends TypeAdapter<Rango> {
+class ClienteAdapter extends TypeAdapter<Cliente> {
   @override
-  final int typeId = 0;
+  final int typeId = 3;
 
   @override
-  Rango read(BinaryReader reader) {
+  Cliente read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return Rango()
+    return Cliente()
       ..id = fields[0] as String
       ..nombre = fields[1] as String
-      ..multiplicador = fields[2] as double
-      ..activo = fields[3] as bool
-      ..creadoEn = fields[4] as DateTime
-      ..tipo = fields[5] as String?;
+      ..activo = fields[2] as bool
+      ..creadoEn = fields[3] as DateTime;
   }
 
   @override
-  void write(BinaryWriter writer, Rango obj) {
+  void write(BinaryWriter writer, Cliente obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
       ..write(obj.nombre)
       ..writeByte(2)
-      ..write(obj.multiplicador)
-      ..writeByte(3)
       ..write(obj.activo)
-      ..writeByte(4)
-      ..write(obj.creadoEn)
-      ..writeByte(5)
-      ..write(obj.tipo);
+      ..writeByte(3)
+      ..write(obj.creadoEn);
   }
 
   @override
@@ -49,7 +43,7 @@ class RangoAdapter extends TypeAdapter<Rango> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is RangoAdapter &&
+      other is ClienteAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

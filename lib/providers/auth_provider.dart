@@ -17,6 +17,9 @@ class AuthProvider extends ChangeNotifier {
       case kCodigoSupervisor:
         _role = kRolSupervisor;
         break;
+      case kCodigoSupervisorMenudencias:
+        _role = kRolSupervisorMenudencias;
+        break;
       default:
         return false;
     }

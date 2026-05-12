@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import 'rangos_screen.dart';
+import 'clientes_screen.dart';
 import 'reporte_totales_screen.dart';
 import 'reporte_rendimiento_screen.dart';
 
@@ -17,6 +18,7 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
 
   static const _tabs = [
     _TabInfo(label: 'Rangos', icon: Icons.category, title: 'Gestión de Rangos'),
+    _TabInfo(label: 'Clientes', icon: Icons.business, title: 'Clientes'),
     _TabInfo(label: 'Totales', icon: Icons.bar_chart, title: 'Reporte Totales'),
     _TabInfo(label: 'Rendimiento', icon: Icons.trending_up, title: 'Rendimiento'),
   ];
@@ -38,6 +40,7 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
         index: _tab,
         children: const [
           RangosScreen(),
+          ClientesScreen(),
           ReporteTotalesScreen(),
           ReporteRendimientoScreen(),
         ],
