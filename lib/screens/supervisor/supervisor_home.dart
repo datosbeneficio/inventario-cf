@@ -21,11 +21,13 @@ class SupervisorHome extends StatefulWidget {
 class _SupervisorHomeState extends State<SupervisorHome> {
   int _tab = 0;
 
+  static const _titles = ['Inventario Actual', 'Registrar Salida'];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Supervisor Despacho'),
+        title: Text(_titles[_tab]),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -33,20 +35,20 @@ class _SupervisorHomeState extends State<SupervisorHome> {
             onPressed: () => context.read<AuthProvider>().logout(),
           ),
         ],
-        bottom: TabBar(
-          controller: null,
-          tabs: const [
-            Tab(icon: Icon(Icons.inventory_2), text: 'Inventario'),
-            Tab(icon: Icon(Icons.output), text: 'Despacho'),
-          ],
-          onTap: (i) => setState(() => _tab = i),
-        ),
       ),
       body: IndexedStack(
         index: _tab,
         children: const [
           _InventarioTab(),
           _DespachoTab(),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (i) => setState(() => _tab = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.inventory_2), label: 'Inventario'),
+          NavigationDestination(icon: Icon(Icons.output), label: 'Despacho'),
         ],
       ),
     );
