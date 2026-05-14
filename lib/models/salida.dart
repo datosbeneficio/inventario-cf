@@ -12,6 +12,7 @@ class Salida {
   final bool esCola;
   final int unidades;
   final DateTime timestamp;
+  final String? despachoId;
 
   const Salida({
     required this.id,
@@ -25,6 +26,7 @@ class Salida {
     required this.esCola,
     required this.unidades,
     required this.timestamp,
+    this.despachoId,
   });
 
   factory Salida.fromDoc(DocumentSnapshot doc) {
@@ -43,6 +45,7 @@ class Salida {
       timestamp: d['timestamp'] != null
           ? (d['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
+      despachoId: d['despachoId'] as String?,
     );
   }
 

@@ -3,6 +3,11 @@ import '../models/cliente.dart';
 import '../models/rango.dart';
 import '../models/ingreso.dart';
 import '../models/salida.dart';
+import '../models/vehiculo.dart';
+import '../models/destino.dart';
+import '../models/despacho.dart';
+import '../models/empresa_config.dart';
+
 class FirestoreService {
   static final FirestoreService instance = FirestoreService._();
   FirestoreService._();
@@ -169,6 +174,142 @@ class FirestoreService {
 
   Future<void> deleteSalida(String id) =>
       _db.collection('salidas').doc(id).delete();
+
+  // ── Vehículos ────────────────────────────────────────────────────────────
+
+  Stream<List<Vehiculo>> vehiculosStream() => _db
+      .collection('vehiculos')
+      .orderBy('placa')
+      .snapshots()
+      .map((s) => s.docs
+          .map(Vehiculo.fromDoc)
+          .where((v) => v.activo)
+          .toList());
+
+  Future<void> addVehiculo({
+    required String placa,
+    required String conductorNombre,
+    required String conductorCedula,
+    required String conductorCelular,
+    required double capacidadKg,
+  }) =>
+      _db.collection('vehiculos').add({
+        'placa': placa.toUpperCase().trim(),
+        'conductorNombre': conductorNombre.trim(),
+        'conductorCedula': conductorCedula.trim(),
+        'conductorCelular': conductorCelular.trim(),
+        'capacidadKg': capacidadKg,
+        'activo': true,
+        'creadoEn': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> updateVehiculo(
+    String id, {
+    required String placa,
+    required String conductorNombre,
+    required String conductorCedula,
+    required String conductorCelular,
+    required double capacidadKg,
+  }) =>
+      _db.collection('vehiculos').doc(id).update({
+        'placa': placa.toUpperCase().trim(),
+        'conductorNombre': conductorNombre.trim(),
+        'conductorCedula': conductorCedula.trim(),
+        'conductorCelular': conductorCelular.trim(),
+        'capacidadKg': capacidadKg,
+      });
+
+  Future<void> deleteVehiculo(String id) =>
+      _db.collection('vehiculos').doc(id).update({'activo': false});
+
+  // ── Destinos ─────────────────────────────────────────────────────────────
+
+  Stream<List<Destino>> destinosStream() => _db
+      .collection('destinos')
+      .orderBy('nombre')
+      .snapshots()
+      .map((s) => s.docs
+          .map(Destino.fromDoc)
+          .where((d) => d.activo)
+          .toList());
+
+  Future<void> addDestino({
+    required String nombre,
+    required String direccion,
+    required String municipio,
+    required String departamento,
+  }) =>
+      _db.collection('destinos').add({
+        'nombre': nombre.trim(),
+        'direccion': direccion.trim(),
+        'municipio': municipio.trim(),
+        'departamento': departamento.trim(),
+        'activo': true,
+        'creadoEn': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> updateDestino(
+    String id, {
+    required String nombre,
+    required String direccion,
+    required String municipio,
+    required String departamento,
+  }) =>
+      _db.collection('destinos').doc(id).update({
+        'nombre': nombre.trim(),
+        'direccion': direccion.trim(),
+        'municipio': municipio.trim(),
+        'departamento': departamento.trim(),
+      });
+
+  Future<void> deleteDestino(String id) =>
+      _db.collection('destinos').doc(id).update({'activo': false});
+
+  // ── Despachos ────────────────────────────────────────────────────────────
+
+  Stream<List<Despacho>> despachosStream() => _db
+      .collection('despachos')
+      .orderBy('timestamp', descending: true)
+      .snapshots()
+      .map((s) => s.docs.map(Despacho.fromDoc).toList());
+
+  /// Crea el documento de despacho y todas las salidas en un único batch.
+  Future<void> addDespacho(Despacho despacho) async {
+    final batch = _db.batch();
+    final despachoRef = _db.collection('despachos').doc();
+    batch.set(despachoRef, despacho.toMap());
+    for (final linea in despacho.lineas) {
+      final salidaRef = _db.collection('salidas').doc();
+      batch.set(salidaRef, linea.toSalidaMap(despachoRef.id));
+    }
+    await batch.commit();
+  }
+
+  Future<void> deleteDespacho(String despachoId) async {
+    // Eliminar el documento de despacho y las salidas asociadas
+    final batch = _db.batch();
+    batch.delete(_db.collection('despachos').doc(despachoId));
+    final salidas = await _db
+        .collection('salidas')
+        .where('despachoId', isEqualTo: despachoId)
+        .get();
+    for (final doc in salidas.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
+  // ── Config empresa ────────────────────────────────────────────────────────
+
+  Stream<EmpresaConfig> empresaConfigStream() => _db
+      .collection('config')
+      .doc('empresa')
+      .snapshots()
+      .map((doc) =>
+          doc.exists ? EmpresaConfig.fromDoc(doc) : EmpresaConfig.empty());
+
+  Future<void> updateEmpresaConfig(EmpresaConfig config) =>
+      _db.collection('config').doc('empresa').set(config.toMap());
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 

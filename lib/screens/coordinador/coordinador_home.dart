@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import 'clientes_screen.dart';
+import 'empresa_config_screen.dart';
 import 'reporte_totales_screen.dart';
 import 'reporte_rendimiento_screen.dart';
 
@@ -36,6 +37,15 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
       appBar: AppBar(
         title: Text(_tabs[_tab].title),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Datos de empresa',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const EmpresaConfigScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión',

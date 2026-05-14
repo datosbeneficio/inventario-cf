@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../models/salida.dart';
-import '../../models/cliente.dart';
+import '../../models/despacho.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/firestore_service.dart';
-import '../../widgets/entrada_form.dart';
-import '../../widgets/menudencias_form.dart';
-import '../../widgets/movimiento_tile.dart';
-import '../../widgets/inventario_panel.dart';
-import '../../widgets/confirm_delete_dialog.dart';
-import '../../utils/constants.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/inventario_panel.dart';
+import 'despacho_detalle_screen.dart';
+import 'destinos_screen.dart';
+import 'nuevo_despacho_screen.dart';
+import 'vehiculos_screen.dart';
 
 class SupervisorHome extends StatefulWidget {
   const SupervisorHome({super.key});
@@ -24,8 +21,9 @@ class _SupervisorHomeState extends State<SupervisorHome> {
 
   static const _titles = [
     'Inventario Actual',
-    'Despacho Aves',
-    'Despacho Menudencias',
+    'Nuevo Despacho',
+    'Historial de Despachos',
+    'Gestión',
   ];
 
   @override
@@ -45,8 +43,9 @@ class _SupervisorHomeState extends State<SupervisorHome> {
         index: _tab,
         children: const [
           InventarioPanel(),
-          _DespachoAvesTab(),
-          _DespachoMenudenciasTab(),
+          NuevoDespachoScreen(),
+          _HistorialTab(),
+          _GestionTab(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -54,84 +53,24 @@ class _SupervisorHomeState extends State<SupervisorHome> {
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
           NavigationDestination(
-              icon: Icon(Icons.inventory_2), label: 'Inventario'),
-          NavigationDestination(icon: Icon(Icons.set_meal), label: 'Aves'),
+            icon: Icon(Icons.inventory_2_outlined),
+            selectedIcon: Icon(Icons.inventory_2),
+            label: 'Inventario',
+          ),
           NavigationDestination(
-              icon: Icon(Icons.restaurant), label: 'Menudencias'),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Despacho Aves ──────────────────────────────────────────────────────────
-
-class _DespachoAvesTab extends StatelessWidget {
-  const _DespachoAvesTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final todasSalidas = context.watch<List<Salida>>();
-    final salidas = _porFechaYTipo(todasSalidas, DateTime.now(), kTipoAves);
-
-    return LayoutBuilder(builder: (ctx, constraints) {
-      final form = _AvesFormPanel();
-      final list = _ListaSalidas(salidas: salidas, tipo: kTipoAves);
-      if (constraints.maxWidth >= 700) {
-        return Row(children: [
-          SizedBox(width: 380, child: form),
-          const VerticalDivider(width: 1),
-          Expanded(child: list),
-        ]);
-      }
-      return Column(children: [
-        Padding(padding: const EdgeInsets.all(16), child: form),
-        const Divider(),
-        Expanded(child: list),
-      ]);
-    });
-  }
-}
-
-class _AvesFormPanel extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Despacho — Aves en Canal',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          EntradaForm(
-            submitLabel: 'Registrar Salida',
-            soloConInventario: true,
-            onSubmit: ({
-              required clienteId,
-              required clienteNombre,
-              required rangoId,
-              required rangoNombre,
-              required inputValue,
-              required peso,
-              required esCola,
-              required multiplicador,
-            }) =>
-                FirestoreService.instance.addSalida(
-              clienteId: clienteId,
-              clienteNombre: clienteNombre,
-              rangoId: rangoId,
-              rangoNombre: rangoNombre,
-              rangoTipo: kTipoAves,
-              canastillas: esCola ? 1 : inputValue,
-              peso: peso,
-              esCola: esCola,
-              unidades: FirestoreService.calcularUnidades(
-                  esCola, inputValue, multiplicador),
-            ),
+            icon: Icon(Icons.local_shipping_outlined),
+            selectedIcon: Icon(Icons.local_shipping),
+            label: 'Despacho',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Historial',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Gestión',
           ),
         ],
       ),
@@ -139,230 +78,151 @@ class _AvesFormPanel extends StatelessWidget {
   }
 }
 
-// ── Despacho Menudencias ───────────────────────────────────────────────────
+// ── Historial de despachos ─────────────────────────────────────────────────
 
-class _DespachoMenudenciasTab extends StatelessWidget {
-  const _DespachoMenudenciasTab();
-
-  @override
-  Widget build(BuildContext context) {
-    final todasSalidas = context.watch<List<Salida>>();
-    final salidas =
-        _porFechaYTipo(todasSalidas, DateTime.now(), kTipoMenudencias);
-
-    return LayoutBuilder(builder: (ctx, constraints) {
-      final form = _MenudFormPanel();
-      final list = _ListaSalidas(salidas: salidas, tipo: kTipoMenudencias);
-      if (constraints.maxWidth >= 700) {
-        return Row(children: [
-          SizedBox(width: 380, child: form),
-          const VerticalDivider(width: 1),
-          Expanded(child: list),
-        ]);
-      }
-      return Column(children: [
-        Padding(padding: const EdgeInsets.all(16), child: form),
-        const Divider(),
-        Expanded(child: list),
-      ]);
-    });
-  }
-}
-
-class _MenudFormPanel extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Despacho — Menudencias',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          MenudenciasForm(
-            submitLabel: 'Registrar Salida',
-            soloConInventario: true,
-            onSubmit: ({
-              required clienteId,
-              required clienteNombre,
-              required rangoId,
-              required rangoNombre,
-              required canastillas,
-              required unidades,
-              required peso,
-            }) =>
-                FirestoreService.instance.addSalida(
-              clienteId: clienteId,
-              clienteNombre: clienteNombre,
-              rangoId: rangoId,
-              rangoNombre: rangoNombre,
-              rangoTipo: kTipoMenudencias,
-              canastillas: canastillas,
-              peso: peso,
-              esCola: false,
-              unidades: unidades,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Lista de salidas compartida ────────────────────────────────────────────
-
-class _ListaSalidas extends StatelessWidget {
-  final List<Salida> salidas;
-  final String tipo;
-  const _ListaSalidas({required this.salidas, required this.tipo});
+class _HistorialTab extends StatelessWidget {
+  const _HistorialTab();
 
   @override
   Widget build(BuildContext context) {
-    if (salidas.isEmpty) {
-      return const Center(child: Text('Sin salidas hoy'));
+    final despachos = context.watch<List<Despacho>>();
+
+    if (despachos.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.black26),
+            SizedBox(height: 12),
+            Text('Sin despachos registrados',
+                style: TextStyle(color: Colors.black54)),
+          ],
+        ),
+      );
     }
 
-    final esAves = tipo == kTipoAves;
-    final total = salidas.fold(0, (s, i) => s + i.unidades);
-    final totalLabel = esAves ? 'unid.' : 'unid.';
+    // Ordenar del más reciente al más antiguo
+    final sorted = [...despachos]
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Text('Salidas de hoy (${salidas.length})',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
-              Text('Total: ${formatNum(total)} $totalLabel',
-                  style: const TextStyle(fontSize: 13)),
-            ],
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: sorted.length,
+      itemBuilder: (_, i) => _DespachTile(d: sorted[i]),
+    );
+  }
+}
+
+class _DespachTile extends StatelessWidget {
+  final Despacho d;
+  const _DespachTile({required this.d});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: cs.primaryContainer,
+          child: Icon(Icons.local_shipping,
+              size: 20, color: cs.onPrimaryContainer),
+        ),
+        title: Row(
+          children: [
+            Text('Guía N° ${d.guiaNro}',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                formatDate(d.fechaDespacho),
+                style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onErrorContainer,
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${d.destinoNombre}  ·  ${d.placa}'),
+            Text(
+              '${d.lineas.length} línea(s)  ·  '
+              '${formatNum(d.totalCanastillas)} canast.  ·  '
+              '${formatNum(d.totalPeso)} kg',
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+        isThreeLine: true,
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DespachoDetalleScreen(despacho: d),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Gestión: sub-tabs Vehículos / Destinos ─────────────────────────────────
+
+class _GestionTab extends StatefulWidget {
+  const _GestionTab();
+
+  @override
+  State<_GestionTab> createState() => _GestionTabState();
+}
+
+class _GestionTabState extends State<_GestionTab>
+    with SingleTickerProviderStateMixin {
+  late final TabController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TabBar(
+          controller: _ctrl,
+          tabs: const [
+            Tab(icon: Icon(Icons.local_shipping_outlined), text: 'Vehículos'),
+            Tab(
+                icon: Icon(Icons.location_on_outlined),
+                text: 'Destinos'),
+          ],
+        ),
         Expanded(
-          child: ListView.builder(
-            itemCount: salidas.length,
-            itemBuilder: (ctx, i) {
-              final salida = salidas[i];
-              return MovimientoTile(
-                rangoNombre: salida.rangoNombre,
-                clienteNombre: salida.clienteNombre.isNotEmpty
-                    ? salida.clienteNombre
-                    : null,
-                unidades: salida.unidades,
-                peso: salida.peso,
-                esCola: salida.esCola,
-                canastillas: salida.canastillas,
-                timestamp: salida.timestamp,
-                onEdit: () => _showEditDialog(context, salida, tipo),
-                onDelete: () async {
-                  final label =
-                      '${salida.rangoNombre} — ${formatNum(salida.unidades)} unid.';
-                  final ok = await showConfirmDelete(ctx, label);
-                  if (ok) FirestoreService.instance.deleteSalida(salida.id);
-                },
-              );
-            },
+          child: TabBarView(
+            controller: _ctrl,
+            children: const [
+              VehiculosScreen(),
+              DestinosScreen(),
+            ],
           ),
         ),
       ],
     );
   }
-
-  void _showEditDialog(BuildContext context, Salida salida, String tipo) {
-    final clientes = context.read<List<Cliente>>();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar salida'),
-        content: SizedBox(
-          width: 360,
-          child: SingleChildScrollView(
-            child: Provider<List<Cliente>>.value(
-              value: clientes,
-              child: tipo == kTipoMenudencias
-                  ? MenudenciasForm(
-                      submitLabel: 'Guardar cambios',
-                      initialClienteId: salida.clienteId,
-                      initialRangoId: salida.rangoId,
-                      initialCanastillas: salida.canastillas,
-                      initialPeso: salida.peso,
-                      onSubmit: ({
-                        required clienteId,
-                        required clienteNombre,
-                        required rangoId,
-                        required rangoNombre,
-                        required canastillas,
-                        required unidades,
-                        required peso,
-                      }) async {
-                        await FirestoreService.instance.updateSalida(
-                          salida.id,
-                          canastillas: canastillas,
-                          peso: peso,
-                          esCola: false,
-                          unidades: unidades,
-                        );
-                        if (ctx.mounted) Navigator.pop(ctx);
-                      },
-                    )
-                  : EntradaForm(
-                      submitLabel: 'Guardar cambios',
-                      initialClienteId: salida.clienteId,
-                      initialRangoId: salida.rangoId,
-                      initialInputValue:
-                          salida.esCola ? salida.unidades : salida.canastillas,
-                      initialPeso: salida.peso,
-                      initialEsCola: salida.esCola,
-                      onSubmit: ({
-                        required clienteId,
-                        required clienteNombre,
-                        required rangoId,
-                        required rangoNombre,
-                        required inputValue,
-                        required peso,
-                        required esCola,
-                        required multiplicador,
-                      }) async {
-                        await FirestoreService.instance.updateSalida(
-                          salida.id,
-                          canastillas: esCola ? 1 : inputValue,
-                          peso: peso,
-                          esCola: esCola,
-                          unidades: FirestoreService.calcularUnidades(
-                              esCola, inputValue, multiplicador),
-                        );
-                        if (ctx.mounted) Navigator.pop(ctx);
-                      },
-                    ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-List<Salida> _porFechaYTipo(
-    List<Salida> todas, DateTime fecha, String tipo) {
-  return todas
-      .where((s) =>
-          s.rangoTipo == tipo &&
-          s.timestamp.year == fecha.year &&
-          s.timestamp.month == fecha.month &&
-          s.timestamp.day == fecha.day)
-      .toList();
 }
