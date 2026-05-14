@@ -128,9 +128,7 @@ class _RangosCliente extends StatelessWidget {
 
         return Column(
           children: [
-            // Lista de rangos existentes
             ...rangos.map((r) => _RangoTile(clienteId: cliente.id, rango: r)),
-            // Botón para agregar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
               child: OutlinedButton.icon(
@@ -148,96 +146,163 @@ class _RangosCliente extends StatelessWidget {
 
   void _showCrearRangoDialog(BuildContext context, String clienteId) {
     final nombreCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
     final multCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     String tipoSel = kTipoAves;
+    String subtipoSel = kSubtipoCanastillas;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDs) => AlertDialog(
           title: Text('Nuevo rango — ${cliente.nombre}'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nombreCtrl,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre del rango',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Campo requerido'
-                          : null,
-                ),
-                const SizedBox(height: 12),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(
-                      value: kTipoAves,
-                      label: Text('Aves'),
-                      icon: Icon(Icons.set_meal),
-                    ),
-                    ButtonSegment(
-                      value: kTipoMenudencias,
-                      label: Text('Menudencias'),
-                      icon: Icon(Icons.restaurant),
-                    ),
-                  ],
-                  selected: {tipoSel},
-                  onSelectionChanged: (s) =>
-                      setDs(() => tipoSel = s.first),
-                ),
-                const SizedBox(height: 12),
-                if (tipoSel == kTipoAves)
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Nombre ──────────────────────────────────────────
                   TextFormField(
-                    controller: multCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                          RegExp(r'[0-9.]')),
-                    ],
+                    controller: nombreCtrl,
+                    autofocus: true,
                     decoration: const InputDecoration(
-                      labelText: 'Multiplicador (unid/canastilla)',
+                      labelText: 'Nombre del rango',
                       border: OutlineInputBorder(),
-                      hintText: 'Ej: 20',
                     ),
-                    validator: (v) {
-                      if (tipoSel == kTipoMenudencias) return null;
-                      if (v == null || v.isEmpty) return 'Campo requerido';
-                      final n = double.tryParse(v);
-                      if (n == null || n <= 0) return 'Valor inválido';
-                      return null;
-                    },
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .tertiaryContainer,
-                      borderRadius: BorderRadius.circular(8),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty)
+                            ? 'Campo requerido'
+                            : null,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Descripción (opcional) ───────────────────────────
+                  TextField(
+                    controller: descCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripción (opcional)',
+                      border: OutlineInputBorder(),
+                      hintText: 'Ej: Pollo entero > 2 kg',
                     ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.info_outline, size: 16),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Menudencias se registra en canastillas directas',
-                            style: TextStyle(fontSize: 12),
-                          ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Tipo: Aves / Menudencias ─────────────────────────
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: kTipoAves,
+                        label: Text('Aves'),
+                        icon: Icon(Icons.set_meal),
+                      ),
+                      ButtonSegment(
+                        value: kTipoMenudencias,
+                        label: Text('Menudencias'),
+                        icon: Icon(Icons.restaurant),
+                      ),
+                    ],
+                    selected: {tipoSel},
+                    onSelectionChanged: (s) => setDs(() {
+                      tipoSel = s.first;
+                      subtipoSel = kSubtipoCanastillas;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Campos condicionales por tipo ────────────────────
+                  if (tipoSel == kTipoAves) ...[
+                    TextFormField(
+                      controller: multCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[0-9.]')),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'Multiplicador (unid/canastilla)',
+                        border: OutlineInputBorder(),
+                        hintText: 'Ej: 20',
+                      ),
+                      validator: (v) {
+                        if (tipoSel != kTipoAves) return null;
+                        if (v == null || v.isEmpty) return 'Campo requerido';
+                        final n = double.tryParse(v);
+                        if (n == null || n <= 0) return 'Valor inválido';
+                        return null;
+                      },
+                    ),
+                  ] else ...[
+                    // Subtipo: Canastillas / Paquetes
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: kSubtipoCanastillas,
+                          label: Text('Canastillas'),
+                          icon: Icon(Icons.shopping_basket),
+                        ),
+                        ButtonSegment(
+                          value: kSubtipoPaquetes,
+                          label: Text('Paquetes'),
+                          icon: Icon(Icons.inventory_2),
                         ),
                       ],
+                      selected: {subtipoSel},
+                      onSelectionChanged: (s) =>
+                          setDs(() => subtipoSel = s.first),
                     ),
-                  ),
-              ],
+                    const SizedBox(height: 12),
+                    if (subtipoSel == kSubtipoPaquetes)
+                      TextFormField(
+                        controller: multCtrl,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(
+                                decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'[0-9.]')),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Paquetes por canastilla',
+                          border: OutlineInputBorder(),
+                          hintText: 'Ej: 12',
+                        ),
+                        validator: (v) {
+                          if (subtipoSel != kSubtipoPaquetes) return null;
+                          if (v == null || v.isEmpty) return 'Campo requerido';
+                          final n = double.tryParse(v);
+                          if (n == null || n <= 0) return 'Valor inválido';
+                          return null;
+                        },
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .tertiaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 16),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Se registra en canastillas directas (sin multiplicador)',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ],
+              ),
             ),
           ),
           actions: [
@@ -248,14 +313,25 @@ class _RangosCliente extends StatelessWidget {
             FilledButton(
               onPressed: () {
                 if (!formKey.currentState!.validate()) return;
-                final mult = tipoSel == kTipoMenudencias
-                    ? 1.0
-                    : double.parse(multCtrl.text);
+                double mult;
+                if (tipoSel == kTipoAves) {
+                  mult = double.parse(multCtrl.text);
+                } else if (subtipoSel == kSubtipoPaquetes) {
+                  mult = double.parse(multCtrl.text);
+                } else {
+                  mult = 1.0;
+                }
                 FirestoreService.instance.addRango(
                   clienteId,
                   nombreCtrl.text,
                   mult,
                   tipoSel,
+                  subtipo: tipoSel == kTipoMenudencias
+                      ? subtipoSel
+                      : kSubtipoCanastillas,
+                  descripcion: descCtrl.text.trim().isEmpty
+                      ? null
+                      : descCtrl.text.trim(),
                 );
                 Navigator.pop(ctx);
               },
@@ -280,6 +356,15 @@ class _RangoTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final esAves = rango.tipo == kTipoAves;
 
+    String tipoLabel;
+    if (esAves) {
+      tipoLabel = 'Aves · ×${formatNum(rango.multiplicador)}';
+    } else if (rango.esPaquetes) {
+      tipoLabel = 'Menudencias · paquetes · ×${formatNum(rango.multiplicador)}';
+    } else {
+      tipoLabel = 'Menudencias · canastillas directas';
+    }
+
     return ListTile(
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
@@ -288,18 +373,28 @@ class _RangoTile extends StatelessWidget {
         backgroundColor:
             esAves ? cs.primaryContainer : cs.tertiaryContainer,
         child: Icon(
-          esAves ? Icons.set_meal : Icons.restaurant,
+          esAves
+              ? Icons.set_meal
+              : rango.esPaquetes
+                  ? Icons.inventory_2
+                  : Icons.restaurant,
           size: 16,
           color: esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer,
         ),
       ),
       title: Text(rango.nombre),
-      subtitle: Text(
-        esAves
-            ? 'Aves · ×${formatNum(rango.multiplicador)}'
-            : 'Menudencias · canastillas directas',
-        style: const TextStyle(fontSize: 12),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (rango.descripcion != null && rango.descripcion!.isNotEmpty)
+            Text(
+              rango.descripcion!,
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          Text(tipoLabel, style: const TextStyle(fontSize: 12)),
+        ],
       ),
+      isThreeLine: rango.descripcion != null && rango.descripcion!.isNotEmpty,
       trailing: IconButton(
         icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
         tooltip: 'Eliminar rango',

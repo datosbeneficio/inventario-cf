@@ -10,3 +10,7 @@ const String kRolSupervisorMenudencias = 'supervisor_menudencias';
 
 const String kTipoAves = 'aves';
 const String kTipoMenudencias = 'menudencias';
+
+// Subtipos de menudencias
+const String kSubtipoCanastillas = 'canastillas';
+const String kSubtipoPaquetes    = 'paquetes';

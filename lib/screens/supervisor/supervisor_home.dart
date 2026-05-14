@@ -190,6 +190,7 @@ class _MenudFormPanel extends StatelessWidget {
               required rangoId,
               required rangoNombre,
               required canastillas,
+              required unidades,
               required peso,
             }) =>
                 FirestoreService.instance.addSalida(
@@ -201,7 +202,7 @@ class _MenudFormPanel extends StatelessWidget {
               canastillas: canastillas,
               peso: peso,
               esCola: false,
-              unidades: canastillas,
+              unidades: unidades,
             ),
           ),
         ],
@@ -224,10 +225,8 @@ class _ListaSalidas extends StatelessWidget {
     }
 
     final esAves = tipo == kTipoAves;
-    final total = esAves
-        ? salidas.fold(0, (s, i) => s + i.unidades)
-        : salidas.fold(0, (s, i) => s + i.canastillas);
-    final totalLabel = esAves ? 'unid.' : 'canast.';
+    final total = salidas.fold(0, (s, i) => s + i.unidades);
+    final totalLabel = esAves ? 'unid.' : 'unid.';
 
     return Column(
       children: [
@@ -253,16 +252,15 @@ class _ListaSalidas extends StatelessWidget {
                 clienteNombre: salida.clienteNombre.isNotEmpty
                     ? salida.clienteNombre
                     : null,
-                unidades: esAves ? salida.unidades : salida.canastillas,
+                unidades: salida.unidades,
                 peso: salida.peso,
                 esCola: salida.esCola,
                 canastillas: salida.canastillas,
                 timestamp: salida.timestamp,
                 onEdit: () => _showEditDialog(context, salida, tipo),
                 onDelete: () async {
-                  final label = esAves
-                      ? '${salida.rangoNombre} — ${formatNum(salida.unidades)} unid.'
-                      : '${salida.rangoNombre} — ${formatNum(salida.canastillas)} canast.';
+                  final label =
+                      '${salida.rangoNombre} — ${formatNum(salida.unidades)} unid.';
                   final ok = await showConfirmDelete(ctx, label);
                   if (ok) FirestoreService.instance.deleteSalida(salida.id);
                 },
@@ -298,6 +296,7 @@ class _ListaSalidas extends StatelessWidget {
                         required rangoId,
                         required rangoNombre,
                         required canastillas,
+                        required unidades,
                         required peso,
                       }) async {
                         await FirestoreService.instance.updateSalida(
@@ -305,7 +304,7 @@ class _ListaSalidas extends StatelessWidget {
                           canastillas: canastillas,
                           peso: peso,
                           esCola: false,
-                          unidades: canastillas,
+                          unidades: unidades,
                         );
                         if (ctx.mounted) Navigator.pop(ctx);
                       },

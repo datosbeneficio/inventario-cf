@@ -13,6 +13,7 @@ typedef OnSubmitMenudencias = Future<void> Function({
   required String rangoId,
   required String rangoNombre,
   required int canastillas,
+  required int unidades,
   required double peso,
 });
 
@@ -47,6 +48,12 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
   final _pesoCtrl = TextEditingController();
   bool _submitting = false;
 
+  bool get _esPaquetes => _rangoObj?.esPaquetes ?? false;
+  int get _canastillas => int.tryParse(_canastillasCtrl.text) ?? 0;
+  int get _preview => _esPaquetes
+      ? FirestoreService.calcularUnidades(false, _canastillas, _rangoObj!.multiplicador)
+      : _canastillas;
+
   @override
   void initState() {
     super.initState();
@@ -71,13 +78,20 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
     if (!_formKey.currentState!.validate()) return;
     if (_rangoObj == null || _clienteId == null) return;
     final cliente = clientes.firstWhere((c) => c.id == _clienteId);
+    final canastillas = _canastillas;
+    final unidades = _esPaquetes
+        ? FirestoreService.calcularUnidades(
+            false, canastillas, _rangoObj!.multiplicador)
+        : canastillas;
+
     setState(() => _submitting = true);
     await widget.onSubmit(
       clienteId: cliente.id,
       clienteNombre: cliente.nombre,
       rangoId: _rangoObj!.id,
       rangoNombre: _rangoObj!.nombre,
-      canastillas: int.parse(_canastillasCtrl.text),
+      canastillas: canastillas,
+      unidades: unidades,
       peso: double.parse(_pesoCtrl.text.replaceAll(',', '.')),
     );
     if (mounted) {
@@ -111,7 +125,8 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
             // ignore: deprecated_member_use
             value: clientes.any((c) => c.id == _clienteId) ? _clienteId : null,
             items: clientes
-                .map((c) => DropdownMenuItem(value: c.id, child: Text(c.nombre)))
+                .map((c) =>
+                    DropdownMenuItem(value: c.id, child: Text(c.nombre)))
                 .toList(),
             onChanged: (v) => setState(() {
               _clienteId = v;
@@ -126,7 +141,9 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
           if (_clienteId != null)
             StreamBuilder<List<Rango>>(
               stream: FirestoreService.instance.rangosStream(_clienteId!).map(
-                    (rs) => rs.where((r) => r.tipo == kTipoMenudencias).toList(),
+                    (rs) => rs
+                        .where((r) => r.tipo == kTipoMenudencias)
+                        .toList(),
                   ),
               builder: (ctx, snapshot) {
                 final rangos = snapshot.data ?? [];
@@ -149,19 +166,35 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
                     labelText: 'Tipo de menudencia',
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.restaurant),
-                    suffix: snapshot.connectionState == ConnectionState.waiting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : null,
+                    suffix:
+                        snapshot.connectionState == ConnectionState.waiting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2))
+                            : null,
                   ),
                   // ignore: deprecated_member_use
                   value: resolvedValue,
                   items: rangos
                       .map((r) => DropdownMenuItem(
                             value: r.id,
-                            child: Text(r.nombre),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  r.esPaquetes
+                                      ? Icons.inventory_2
+                                      : Icons.shopping_basket,
+                                  size: 16,
+                                  color: cs.onSurface,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(r.esPaquetes
+                                    ? '${r.nombre} (×${formatNum(r.multiplicador)} paq.)'
+                                    : r.nombre),
+                              ],
+                            ),
                           ))
                       .toList(),
                   onChanged: (v) {
@@ -172,7 +205,9 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
                     });
                   },
                   validator: (v) {
-                    if (_clienteId == null) return 'Primero selecciona un cliente';
+                    if (_clienteId == null) {
+                      return 'Primero selecciona un cliente';
+                    }
                     if (v == null) return 'Selecciona un tipo';
                     return null;
                   },
@@ -236,17 +271,18 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
           ),
           const SizedBox(height: 8),
 
-          if (_rangoObj != null &&
-              (int.tryParse(_canastillasCtrl.text) ?? 0) > 0)
+          // ── Preview ──────────────────────────────────────────────────────
+          if (_rangoObj != null && _canastillas > 0)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: cs.tertiaryContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                'Canastillas a registrar: ${formatNum(int.tryParse(_canastillasCtrl.text) ?? 0)}',
+                _esPaquetes
+                    ? '${formatNum(_canastillas)} canast. → ${formatNum(_preview)} paquetes'
+                    : '${formatNum(_canastillas)} canastillas a registrar',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: cs.onTertiaryContainer),

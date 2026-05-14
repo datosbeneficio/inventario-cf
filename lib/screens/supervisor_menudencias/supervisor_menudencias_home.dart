@@ -120,6 +120,7 @@ class _FormPanel extends StatelessWidget {
               required rangoId,
               required rangoNombre,
               required canastillas,
+              required unidades,
               required peso,
             }) =>
                 FirestoreService.instance.addIngreso(
@@ -131,7 +132,7 @@ class _FormPanel extends StatelessWidget {
               canastillas: canastillas,
               peso: peso,
               esCola: false,
-              unidades: canastillas,
+              unidades: unidades,
             ),
           ),
         ],
@@ -186,7 +187,7 @@ class _ListaIngresos extends StatelessWidget {
                 clienteNombre: ingreso.clienteNombre.isNotEmpty
                     ? ingreso.clienteNombre
                     : null,
-                unidades: ingreso.canastillas,
+                unidades: ingreso.unidades,
                 peso: ingreso.peso,
                 esCola: false,
                 canastillas: ingreso.canastillas,
@@ -230,6 +231,7 @@ class _ListaIngresos extends StatelessWidget {
                   required rangoId,
                   required rangoNombre,
                   required canastillas,
+                  required unidades,
                   required peso,
                 }) async {
                   await FirestoreService.instance.updateIngreso(
@@ -237,7 +239,7 @@ class _ListaIngresos extends StatelessWidget {
                     canastillas: canastillas,
                     peso: peso,
                     esCola: false,
-                    unidades: canastillas,
+                    unidades: unidades,
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },

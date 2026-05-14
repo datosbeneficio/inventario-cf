@@ -46,16 +46,21 @@ class FirestoreService {
     String clienteId,
     String nombre,
     double multiplicador,
-    String tipo,
-  ) =>
+    String tipo, {
+    String subtipo = 'canastillas',
+    String? descripcion,
+  }) =>
       _db
           .collection('clientes')
           .doc(clienteId)
           .collection('rangos')
           .add({
         'nombre': nombre.trim(),
+        if (descripcion != null && descripcion.trim().isNotEmpty)
+          'descripcion': descripcion.trim(),
         'multiplicador': multiplicador,
         'tipo': tipo,
+        'subtipo': subtipo,
         'activo': true,
         'creadoEn': FieldValue.serverTimestamp(),
       });

@@ -132,17 +132,18 @@ class _InventarioCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final esAves = entry.rangoTipo == kTipoAves;
 
-    final saldo = esAves
-        ? (entry.unidadesIn - entry.unidadesOut)
-        : (entry.canastillasIn - entry.canastillasOut);
-    final saldoLabel = esAves ? 'unid.' : 'canast.';
+    final saldoUnid = entry.unidadesIn - entry.unidadesOut;
+    final saldoCan = entry.canastillasIn - entry.canastillasOut;
     final saldoPeso = entry.pesoIn - entry.pesoOut;
 
-    final saldoColor = saldo > 0
+    // Mostrar unidades como valor primario; canastillas como secundario
+    // Si ambos son iguales (menudencias canastillas estándar) omitir línea canastillas
+    final mostrarCan = saldoCan != saldoUnid;
+
+    final saldoColor = saldoUnid > 0
         ? cs.primary
-        : saldo == 0
+        : saldoUnid == 0
             ? cs.onSurfaceVariant
             : cs.error;
 
@@ -179,12 +180,18 @@ class _InventarioCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${formatNum(saldo)} $saldoLabel',
+                  '${formatNum(saldoUnid)} unid.',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: saldoColor),
                 ),
+                if (mostrarCan)
+                  Text(
+                    '${formatNum(saldoCan)} canast.',
+                    style: TextStyle(
+                        fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
                 Text(
                   formatKg(saldoPeso),
                   style: TextStyle(
