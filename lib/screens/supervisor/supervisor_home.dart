@@ -109,6 +109,7 @@ class _AvesFormPanel extends StatelessWidget {
           const SizedBox(height: 16),
           EntradaForm(
             submitLabel: 'Registrar Salida',
+            soloConInventario: true,
             onSubmit: ({
               required clienteId,
               required clienteNombre,
@@ -184,6 +185,7 @@ class _MenudFormPanel extends StatelessWidget {
           const SizedBox(height: 16),
           MenudenciasForm(
             submitLabel: 'Registrar Salida',
+            soloConInventario: true,
             onSubmit: ({
               required clienteId,
               required clienteNombre,

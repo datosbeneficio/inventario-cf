@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/cliente.dart';
+import '../models/ingreso.dart';
 import '../models/rango.dart';
+import '../models/salida.dart';
 import '../services/firestore_service.dart';
 import '../utils/constants.dart';
 import '../utils/formatters.dart';
@@ -21,6 +23,11 @@ typedef OnSubmitEntrada = Future<void> Function({
 class EntradaForm extends StatefulWidget {
   final OnSubmitEntrada onSubmit;
   final String submitLabel;
+
+  /// Si es true, filtra los rangos a sólo los que tienen stock disponible
+  /// y valida que canastillas/peso no excedan el inventario real.
+  final bool soloConInventario;
+
   final String? initialClienteId;
   final String? initialRangoId;
   final int? initialInputValue;
@@ -31,6 +38,7 @@ class EntradaForm extends StatefulWidget {
     super.key,
     required this.onSubmit,
     required this.submitLabel,
+    this.soloConInventario = false,
     this.initialClienteId,
     this.initialRangoId,
     this.initialInputValue,
@@ -42,6 +50,9 @@ class EntradaForm extends StatefulWidget {
   State<EntradaForm> createState() => _EntradaFormState();
 }
 
+// Saldo disponible por (clienteId|rangoId)
+typedef _Saldo = ({int canastillas, int unidades, double peso});
+
 class _EntradaFormState extends State<EntradaForm> {
   final _formKey = GlobalKey<FormState>();
   String? _clienteId;
@@ -52,11 +63,19 @@ class _EntradaFormState extends State<EntradaForm> {
   bool _esCola = false;
   bool _submitting = false;
 
+  // Se puebla en build() cuando soloConInventario == true
+  Map<String, _Saldo> _saldoMap = {};
+
   int get _inputValue => int.tryParse(_inputCtrl.text) ?? 0;
 
   int get _preview {
     final mult = _rangoObj?.multiplicador ?? 1.0;
     return FirestoreService.calcularUnidades(_esCola, _inputValue, mult);
+  }
+
+  _Saldo? get _saldoActual {
+    if (_clienteId == null || _rangoObj == null) return null;
+    return _saldoMap['$_clienteId|${_rangoObj!.id}'];
   }
 
   @override
@@ -78,6 +97,32 @@ class _EntradaFormState extends State<EntradaForm> {
     _inputCtrl.dispose();
     _pesoCtrl.dispose();
     super.dispose();
+  }
+
+  static Map<String, _Saldo> _buildSaldoMap(
+      List<Ingreso> ingresos, List<Salida> salidas) {
+    final m = <String, _Saldo>{};
+    for (final i in ingresos) {
+      if (i.rangoTipo != kTipoAves) continue;
+      final k = '${i.clienteId}|${i.rangoId}';
+      final p = m[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
+      m[k] = (
+        canastillas: p.canastillas + i.canastillas,
+        unidades: p.unidades + i.unidades,
+        peso: p.peso + i.peso,
+      );
+    }
+    for (final s in salidas) {
+      if (s.rangoTipo != kTipoAves) continue;
+      final k = '${s.clienteId}|${s.rangoId}';
+      final p = m[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
+      m[k] = (
+        canastillas: p.canastillas - s.canastillas,
+        unidades: p.unidades - s.unidades,
+        peso: p.peso - s.peso,
+      );
+    }
+    return m;
   }
 
   Future<void> _submit(List<Cliente> clientes) async {
@@ -112,6 +157,15 @@ class _EntradaFormState extends State<EntradaForm> {
     final cs = Theme.of(context).colorScheme;
     final clientes = context.watch<List<Cliente>>();
 
+    // Computar saldos en tiempo real (sólo en modo despacho)
+    if (widget.soloConInventario) {
+      final ingresos = context.watch<List<Ingreso>>();
+      final salidas = context.watch<List<Salida>>();
+      _saldoMap = _buildSaldoMap(ingresos, salidas);
+    }
+
+    final saldo = _saldoActual;
+
     return Form(
       key: _formKey,
       child: Column(
@@ -127,7 +181,8 @@ class _EntradaFormState extends State<EntradaForm> {
             // ignore: deprecated_member_use
             value: clientes.any((c) => c.id == _clienteId) ? _clienteId : null,
             items: clientes
-                .map((c) => DropdownMenuItem(value: c.id, child: Text(c.nombre)))
+                .map((c) =>
+                    DropdownMenuItem(value: c.id, child: Text(c.nombre)))
                 .toList(),
             onChanged: (v) => setState(() {
               _clienteId = v;
@@ -138,16 +193,24 @@ class _EntradaFormState extends State<EntradaForm> {
           ),
           const SizedBox(height: 12),
 
-          // ── Rango (dinámico por cliente) ─────────────────────────────────
+          // ── Rango (dinámico por cliente, filtrado por inventario) ─────────
           if (_clienteId != null)
             StreamBuilder<List<Rango>>(
               stream: FirestoreService.instance.rangosStream(_clienteId!).map(
                     (rs) => rs.where((r) => r.tipo == kTipoAves).toList(),
                   ),
               builder: (ctx, snapshot) {
-                final rangos = snapshot.data ?? [];
+                final allRangos = snapshot.data ?? [];
 
-                // Resolve initial rango object when stream first arrives
+                // Filtrar sólo rangos con stock cuando soloConInventario
+                final rangos = widget.soloConInventario
+                    ? allRangos.where((r) {
+                        final s = _saldoMap['$_clienteId|${r.id}'];
+                        return s != null && s.unidades > 0;
+                      }).toList()
+                    : allRangos;
+
+                // Resolver el objeto rango inicial cuando llega el stream
                 if (_rangoId != null && _rangoObj == null && rangos.isNotEmpty) {
                   final found =
                       rangos.where((r) => r.id == _rangoId).firstOrNull;
@@ -170,8 +233,7 @@ class _EntradaFormState extends State<EntradaForm> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2))
+                            child: CircularProgressIndicator(strokeWidth: 2))
                         : null,
                   ),
                   // ignore: deprecated_member_use
@@ -191,7 +253,9 @@ class _EntradaFormState extends State<EntradaForm> {
                     });
                   },
                   validator: (v) {
-                    if (_clienteId == null) return 'Primero selecciona un cliente';
+                    if (_clienteId == null) {
+                      return 'Primero selecciona un cliente';
+                    }
                     if (v == null) return 'Selecciona un rango';
                     return null;
                   },
@@ -212,6 +276,36 @@ class _EntradaFormState extends State<EntradaForm> {
                   _clienteId == null ? 'Primero selecciona un cliente' : null,
             ),
           const SizedBox(height: 12),
+
+          // ── Stock disponible (sólo despacho) ─────────────────────────────
+          if (widget.soloConInventario && saldo != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: cs.secondaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.inventory_2,
+                        size: 14, color: cs.onSecondaryContainer),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Disponible: ${formatNum(saldo.canastillas)} canast. · '
+                        '${formatNum(saldo.unidades)} unid. · '
+                        '${formatKg(saldo.peso)}',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSecondaryContainer),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // ── Cola toggle ──────────────────────────────────────────────────
           SwitchListTile(
@@ -247,7 +341,15 @@ class _EntradaFormState extends State<EntradaForm> {
             onChanged: (_) => setState(() {}),
             validator: (v) {
               if (v == null || v.isEmpty) return 'Campo requerido';
-              if ((int.tryParse(v) ?? 0) <= 0) return 'Debe ser mayor a 0';
+              final n = int.tryParse(v) ?? 0;
+              if (n <= 0) return 'Debe ser mayor a 0';
+              if (widget.soloConInventario && saldo != null) {
+                final max = _esCola ? saldo.unidades : saldo.canastillas;
+                if (n > max) {
+                  return 'Máximo disponible: ${formatNum(max)} '
+                      '${_esCola ? 'unid.' : 'canast.'}';
+                }
+              }
               return null;
             },
           ),
@@ -271,6 +373,11 @@ class _EntradaFormState extends State<EntradaForm> {
               if (v == null || v.isEmpty) return 'Campo requerido';
               final parsed = double.tryParse(v.replaceAll(',', '.'));
               if (parsed == null || parsed <= 0) return 'Peso inválido';
+              if (widget.soloConInventario && saldo != null) {
+                if (parsed > saldo.peso) {
+                  return 'Máximo disponible: ${formatKg(saldo.peso)}';
+                }
+              }
               return null;
             },
           ),
