@@ -41,6 +41,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   final _tempCanalCtrl = TextEditingController();
   final _tempMenudCtrl = TextEditingController();
   final _tempPreCtrl = TextEditingController();
+  final _obsCtrl = TextEditingController();
 
   // ── Foto del precinto ────────────────────────────────────────────────────
   Uint8List? _fotoBytes;
@@ -71,6 +72,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     _tempCanalCtrl.dispose();
     _tempMenudCtrl.dispose();
     _tempPreCtrl.dispose();
+    _obsCtrl.dispose();
     super.dispose();
   }
 
@@ -109,6 +111,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       _tempCanalCtrl.clear();
       _tempMenudCtrl.clear();
       _tempPreCtrl.clear();
+      _obsCtrl.clear();
       _fotoBytes = null;
       _fotoExt = 'jpg';
       _lineas.clear();
@@ -249,6 +252,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         tempCanal: _tempCanalCtrl.text.trim(),
         tempMenudencias: _tempMenudCtrl.text.trim(),
         tempPreEnfriamiento: _tempPreCtrl.text.trim(),
+        observaciones: _obsCtrl.text.trim(),
         lineas: _lineas,
         timestamp: DateTime.now(),
         precintoFotoUrl: fotoUrl,
@@ -562,6 +566,25 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                         ),
                       ),
                     ]),
+                    const SizedBox(height: 12),
+
+                    // ── Observaciones ─────────────────────────────────
+                    TextFormField(
+                      controller: _obsCtrl,
+                      maxLines: 3,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: 'Observaciones (opcional)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Padding(
+                          padding: EdgeInsets.only(bottom: 40),
+                          child: Icon(Icons.notes_outlined),
+                        ),
+                        alignLabelWithHint: true,
+                        hintText:
+                            'Condiciones del producto, novedades del viaje…',
+                      ),
+                    ),
                     const SizedBox(height: 12),
 
                     // ── Foto del precinto ──────────────────────────────

@@ -4,6 +4,7 @@ import '../../models/ciclo_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/firestore_service.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/consolidado_panel.dart';
 import 'clientes_screen.dart';
 import 'empresa_config_screen.dart';
 import 'reporte_totales_screen.dart';
@@ -24,6 +25,10 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
         label: 'Clientes',
         icon: Icons.business,
         title: 'Clientes y Rangos'),
+    _TabInfo(
+        label: 'Consolidado',
+        icon: Icons.analytics,
+        title: 'Inventario Consolidado'),
     _TabInfo(
         label: 'Totales',
         icon: Icons.bar_chart,
@@ -68,6 +73,7 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
         index: _tab,
         children: const [
           ClientesScreen(),
+          ConsolidadoPanel(),
           ReporteTotalesScreen(),
           ReporteRendimientoScreen(),
         ],

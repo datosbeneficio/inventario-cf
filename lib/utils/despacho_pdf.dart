@@ -34,6 +34,10 @@ Future<pw.Document> buildDespachoPdf(
           _infoGrid(d),
           pw.SizedBox(height: 10),
           _lineasTable(d),
+          if (d.observaciones.isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            _observacionesSection(d.observaciones),
+          ],
           if (precintoImg != null) ...[
             pw.SizedBox(height: 10),
             _precintoSection(precintoImg),
@@ -208,6 +212,28 @@ pw.Widget _lineasTable(Despacho d) {
           _cell(formatNum(d.totalUnidades), totalStyle),
           _cell(formatNum(d.totalPeso), totalStyle),
         ],
+      ),
+    ],
+  );
+}
+
+// ── Observaciones ───────────────────────────────────────────────────────────
+
+pw.Widget _observacionesSection(String texto) {
+  final boldSm = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8);
+  final bodyStyle = const pw.TextStyle(fontSize: 9);
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Text('OBSERVACIONES', style: boldSm),
+      pw.SizedBox(height: 3),
+      pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.all(6),
+        decoration: const pw.BoxDecoration(
+          border: pw.Border.fromBorderSide(pw.BorderSide(width: 0.5)),
+        ),
+        child: pw.Text(texto, style: bodyStyle),
       ),
     ],
   );

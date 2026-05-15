@@ -110,6 +110,29 @@ class DespachoDetalleScreen extends StatelessWidget {
             _InfoGrid(d: despacho),
             const SizedBox(height: 16),
 
+            // ── Observaciones ───────────────────────────────────────────
+            if (despacho.observaciones.isNotEmpty) ...[
+              Text('Observaciones',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(despacho.observaciones,
+                    style: const TextStyle(fontSize: 13)),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // ── Foto del precinto ───────────────────────────────────────
             if (despacho.precintoFotoUrl != null &&
                 despacho.precintoFotoUrl!.isNotEmpty) ...[
