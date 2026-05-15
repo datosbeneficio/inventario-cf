@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../models/ciclo_config.dart';
 import '../models/cliente.dart';
 import '../models/ingreso.dart';
 import '../models/rango.dart';
@@ -157,10 +158,17 @@ class _EntradaFormState extends State<EntradaForm> {
     final cs = Theme.of(context).colorScheme;
     final clientes = context.watch<List<Cliente>>();
 
-    // Computar saldos en tiempo real (sólo en modo despacho)
+    // Computar saldos del ciclo activo (solo en modo despacho)
     if (widget.soloConInventario) {
-      final ingresos = context.watch<List<Ingreso>>();
-      final salidas = context.watch<List<Salida>>();
+      final ciclo = context.watch<CicloConfig>();
+      final ingresos = context
+          .watch<List<Ingreso>>()
+          .where((i) => !i.timestamp.isBefore(ciclo.inicio))
+          .toList();
+      final salidas = context
+          .watch<List<Salida>>()
+          .where((s) => !s.timestamp.isBefore(ciclo.inicio))
+          .toList();
       _saldoMap = _buildSaldoMap(ingresos, salidas);
     }
 

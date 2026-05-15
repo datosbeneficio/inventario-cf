@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
+import 'models/ciclo_config.dart';
 import 'models/cliente.dart';
 import 'models/ingreso.dart';
 import 'models/salida.dart';
@@ -47,6 +48,10 @@ void main() async {
         StreamProvider<EmpresaConfig>(
           create: (_) => FirestoreService.instance.empresaConfigStream(),
           initialData: EmpresaConfig.empty(),
+        ),
+        StreamProvider<CicloConfig>(
+          create: (_) => FirestoreService.instance.cicloConfigStream(),
+          initialData: CicloConfig.initial(),
         ),
       ],
       child: const InventarioCfApp(),

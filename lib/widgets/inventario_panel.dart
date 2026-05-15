@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/ciclo_config.dart';
 import '../models/ingreso.dart';
 import '../models/salida.dart';
 import '../utils/constants.dart';
@@ -15,8 +16,16 @@ class InventarioPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ingresos = context.watch<List<Ingreso>>();
-    final salidas = context.watch<List<Salida>>();
+    final ciclo = context.watch<CicloConfig>();
+    // Solo movimientos del ciclo activo
+    final ingresos = context
+        .watch<List<Ingreso>>()
+        .where((i) => !i.timestamp.isBefore(ciclo.inicio))
+        .toList();
+    final salidas = context
+        .watch<List<Salida>>()
+        .where((s) => !s.timestamp.isBefore(ciclo.inicio))
+        .toList();
 
     // Agrupar por (clienteId, rangoId) usando campos denormalizados
     final map = <String, _Saldo>{};

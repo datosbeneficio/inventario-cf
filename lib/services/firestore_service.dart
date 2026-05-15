@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
+import '../models/ciclo_config.dart';
 import '../models/cliente.dart';
 import '../models/rango.dart';
 import '../models/ingreso.dart';
@@ -333,6 +335,22 @@ class FirestoreService {
 
   Future<void> updateEmpresaConfig(EmpresaConfig config) =>
       _db.collection('config').doc('empresa').set(config.toMap());
+
+  // ── Ciclo de producción ───────────────────────────────────────────────────
+
+  Stream<CicloConfig> cicloConfigStream() => _db
+      .collection('config')
+      .doc('ciclo')
+      .snapshots()
+      .map((doc) =>
+          doc.exists ? CicloConfig.fromDoc(doc) : CicloConfig.initial());
+
+  /// Inicia un nuevo ciclo: a partir de este momento el inventario
+  /// visible empieza desde cero. Los registros anteriores se conservan.
+  Future<void> resetCiclo() => _db.collection('config').doc('ciclo').set({
+        'inicio': FieldValue.serverTimestamp(),
+        'cicloId': const Uuid().v4(),
+      });
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 

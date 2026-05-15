@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../../models/ciclo_config.dart';
 import '../../models/cliente.dart';
 import '../../models/despacho.dart';
 import '../../models/destino.dart';
@@ -688,8 +689,16 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 
   void _showAgregarLineaDialog(BuildContext context) {
     final clientes = context.read<List<Cliente>>();
-    final ingresos = context.read<List<Ingreso>>();
-    final salidas = context.read<List<Salida>>();
+    final ciclo = context.read<CicloConfig>();
+    // Solo movimientos del ciclo activo
+    final ingresos = context
+        .read<List<Ingreso>>()
+        .where((i) => !i.timestamp.isBefore(ciclo.inicio))
+        .toList();
+    final salidas = context
+        .read<List<Salida>>()
+        .where((s) => !s.timestamp.isBefore(ciclo.inicio))
+        .toList();
 
     // Compute saldo map
     final saldoMap = <String, ({int canastillas, int unidades, double peso})>{};
