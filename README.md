@@ -1,6 +1,6 @@
 # inventario_cf
 
-A new Flutter project.
+Its a FLutter Project designed to improve.
 
 ## Getting Started
 
