@@ -110,6 +110,41 @@ class DespachoDetalleScreen extends StatelessWidget {
             _InfoGrid(d: despacho),
             const SizedBox(height: 16),
 
+            // ── Foto del precinto ───────────────────────────────────────
+            if (despacho.precintoFotoUrl != null &&
+                despacho.precintoFotoUrl!.isNotEmpty) ...[
+              Text('Foto del precinto',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  despacho.precintoFotoUrl!,
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (_, child, progress) =>
+                      progress == null
+                          ? child
+                          : const SizedBox(
+                              height: 220,
+                              child: Center(
+                                  child: CircularProgressIndicator())),
+                  errorBuilder: (_, error, stack) => const SizedBox(
+                    height: 80,
+                    child: Center(
+                      child: Text('No se pudo cargar la imagen',
+                          style: TextStyle(color: Colors.black45)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // ── Tabla de líneas ─────────────────────────────────────────
             Text('Productos despachados',
                 style: Theme.of(context)

@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../models/cliente.dart';
 import '../../models/despacho.dart';
@@ -23,27 +24,43 @@ class NuevoDespachoScreen extends StatefulWidget {
 class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Transporte
+  // ── Transporte ──────────────────────────────────────────────────────────
   Vehiculo? _vehiculo;
   final _capacidadCtrl = TextEditingController();
   TimeOfDay _horaSalida = TimeOfDay.now();
 
-  // Destino y fechas
+  // ── Destino y fechas ────────────────────────────────────────────────────
   Destino? _destino;
   DateTime _fechaDespacho = DateTime.now();
   DateTime _fechaBeneficio = DateTime.now();
 
-  // Datos adicionales
+  // ── Datos adicionales ───────────────────────────────────────────────────
   final _guiaCtrl = TextEditingController();
   final _precintoCtrl = TextEditingController();
   final _tempCanalCtrl = TextEditingController();
   final _tempMenudCtrl = TextEditingController();
   final _tempPreCtrl = TextEditingController();
 
-  // LÃ­neas de producto
+  // ── Foto del precinto ────────────────────────────────────────────────────
+  Uint8List? _fotoBytes;
+  String _fotoExt = 'jpg';
+
+  // ── Líneas de producto ───────────────────────────────────────────────────
   final List<DespachoLinea> _lineas = [];
 
+  // ── Estado de envío ──────────────────────────────────────────────────────
   bool _submitting = false;
+  bool _despachado = false;
+  Despacho? _ultimoDespacho;
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────
+
+  @override
+  void initState() {
+    super.initState();
+    // Compute next guía number after the first frame (providers ready)
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initGuia());
+  }
 
   @override
   void dispose() {
@@ -56,6 +73,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     super.dispose();
   }
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
   String get _horaSalidaStr {
     final h = _horaSalida.hourOfPeriod == 0 ? 12 : _horaSalida.hourOfPeriod;
     final m = _horaSalida.minute.toString().padLeft(2, '0');
@@ -63,10 +82,127 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     return '$h:$m $p';
   }
 
+  /// Calcula el siguiente número de guía a partir del historial.
+  void _initGuia() {
+    if (!mounted || _guiaCtrl.text.isNotEmpty) return;
+    final despachos = context.read<List<Despacho>>();
+    int maxNro = 0;
+    for (final d in despachos) {
+      final n = int.tryParse(d.guiaNro) ?? 0;
+      if (n > maxNro) maxNro = n;
+    }
+    _guiaCtrl.text = (maxNro + 1).toString();
+  }
+
+  /// Limpia el formulario y prepara un nuevo despacho.
+  void _resetForm() {
+    setState(() {
+      _vehiculo = null;
+      _destino = null;
+      _fechaDespacho = DateTime.now();
+      _fechaBeneficio = DateTime.now();
+      _horaSalida = TimeOfDay.now();
+      _capacidadCtrl.clear();
+      _guiaCtrl.clear();
+      _precintoCtrl.clear();
+      _tempCanalCtrl.clear();
+      _tempMenudCtrl.clear();
+      _tempPreCtrl.clear();
+      _fotoBytes = null;
+      _fotoExt = 'jpg';
+      _lineas.clear();
+      _submitting = false;
+      _despachado = false;
+      _ultimoDespacho = null;
+    });
+    // Re-calcular guía después de limpiar
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _initGuia());
+  }
+
+  // ── Foto del precinto ────────────────────────────────────────────────────
+
+  Future<void> _pickFoto(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final xfile = await picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1200,
+      );
+      if (xfile == null) return;
+      final bytes = await xfile.readAsBytes();
+      final ext = xfile.name.split('.').last.toLowerCase();
+      setState(() {
+        _fotoBytes = bytes;
+        _fotoExt = ['jpg', 'jpeg', 'png', 'webp'].contains(ext) ? ext : 'jpg';
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar la imagen: $e')),
+        );
+      }
+    }
+  }
+
+  void _showFotoOptions() {
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text('Foto del precinto',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Tomar foto'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFoto(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Elegir de galería / archivos'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFoto(ImageSource.gallery);
+              },
+            ),
+            if (_fotoBytes != null)
+              ListTile(
+                leading:
+                    const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Quitar foto',
+                    style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _fotoBytes = null;
+                  });
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Confirmar ─────────────────────────────────────────────────────────────
+
   Future<void> _confirmar() async {
     if (!_formKey.currentState!.validate()) return;
     if (_vehiculo == null) {
-      _showError('Selecciona un vehÃ­culo');
+      _showError('Selecciona un vehículo');
       return;
     }
     if (_destino == null) {
@@ -74,14 +210,24 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       return;
     }
     if (_lineas.isEmpty) {
-      _showError('Agrega al menos una lÃ­nea de producto');
+      _showError('Agrega al menos una línea de producto');
       return;
     }
 
     setState(() => _submitting = true);
     try {
+      // Pre-generar ID para poder subir la foto antes del batch
+      final despachoId = FirestoreService.instance.newDespachoId();
+
+      // Subir foto del precinto (si existe)
+      String? fotoUrl;
+      if (_fotoBytes != null) {
+        fotoUrl = await FirestoreService.instance.uploadPrecintoFoto(
+          despachoId, _fotoBytes!, _fotoExt);
+      }
+
       final despacho = Despacho(
-        id: '',
+        id: despachoId,
         guiaNro: _guiaCtrl.text.trim(),
         fechaDespacho: _fechaDespacho,
         fechaBeneficio: _fechaBeneficio,
@@ -104,40 +250,24 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         tempPreEnfriamiento: _tempPreCtrl.text.trim(),
         lineas: _lineas,
         timestamp: DateTime.now(),
+        precintoFotoUrl: fotoUrl,
       );
-      await FirestoreService.instance.addDespacho(despacho);
+
+      await FirestoreService.instance.addDespacho(
+          despacho, predefinedId: despachoId);
 
       if (mounted) {
-        // Recuperar el despacho reciÃ©n creado (el de mayor timestamp)
-        final despachos = context.read<List<Despacho>>();
-        // Navegar a detalle â€” buscamos en el stream; si aÃºn no llegÃ³, usamos la data local
-        final reciente = despachos.isNotEmpty ? despachos.first : null;
-        if (reciente != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => DespachoDetalleScreen(despacho: reciente),
-            ),
-          );
-        }
-        // Limpiar el formulario
         setState(() {
-          _vehiculo = null;
-          _destino = null;
-          _lineas.clear();
-          _guiaCtrl.clear();
-          _precintoCtrl.clear();
-          _capacidadCtrl.clear();
-          _tempCanalCtrl.clear();
-          _tempMenudCtrl.clear();
-          _tempPreCtrl.clear();
-          _horaSalida = TimeOfDay.now();
-          _fechaDespacho = DateTime.now();
-          _fechaBeneficio = DateTime.now();
+          _submitting = false;
+          _despachado = true;
+          _ultimoDespacho = despacho;
         });
       }
-    } finally {
-      if (mounted) setState(() => _submitting = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        _showError('Error al guardar: $e');
+      }
     }
   }
 
@@ -145,6 +275,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(msg)));
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -154,364 +286,405 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // â”€â”€ SecciÃ³n 1: Transporte â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            _SectionTitle(
-                icon: Icons.local_shipping, label: 'Transporte'),
-            const SizedBox(height: 12),
-
-            // VehÃ­culo
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'VehÃ­culo',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.directions_car),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Banner de éxito (visible tras envío) ───────────────────────
+          if (_despachado && _ultimoDespacho != null) ...[
+            _SuccessBanner(
+              guiaNro: _ultimoDespacho!.guiaNro,
+              onVerGuia: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      DespachoDetalleScreen(despacho: _ultimoDespacho!),
+                ),
               ),
-              initialValue: _vehiculo?.id,
-              items: vehiculos
-                  .map((v) => DropdownMenuItem(
-                        value: v.id,
-                        child: Text('${v.placa} â€” ${v.conductorNombre}'),
-                      ))
-                  .toList(),
-              onChanged: (id) {
-                final sel = vehiculos.firstWhere((v) => v.id == id);
-                setState(() {
-                  _vehiculo = sel;
-                  _capacidadCtrl.text =
-                      formatNum(sel.capacidadKg);
-                });
-              },
-              validator: (v) =>
-                  v == null ? 'Selecciona un vehÃ­culo' : null,
+              onNuevoDespacho: _resetForm,
             ),
+            const SizedBox(height: 16),
+          ],
 
-            // Info del conductor (solo lectura, aparece al seleccionar)
-            if (_vehiculo != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: cs.secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+          // ── Formulario (oculto detrás de AbsorbPointer tras envío) ─────
+          AbsorbPointer(
+            absorbing: _despachado,
+            child: Opacity(
+              opacity: _despachado ? 0.55 : 1.0,
+              child: Form(
+                key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _InfoRow(
-                        icon: Icons.badge,
-                        label: 'CC',
-                        value: _vehiculo!.conductorCedula),
-                    _InfoRow(
-                        icon: Icons.phone,
-                        label: 'Cel.',
-                        value: _vehiculo!.conductorCelular),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
+                    // ── Sección 1: Transporte ──────────────────────────
+                    _SectionTitle(
+                        icon: Icons.local_shipping, label: 'Transporte'),
+                    const SizedBox(height: 12),
 
-            Row(children: [
-              // Capacidad
-              Expanded(
-                child: TextFormField(
-                  controller: _capacidadCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Capacidad',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.scale),
-                    suffixText: 'kg',
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Requerido';
-                    if (double.tryParse(v.replaceAll(',', '.')) == null) {
-                      return 'InvÃ¡lido';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Hora salida
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    final t = await showTimePicker(
-                      context: context,
-                      initialTime: _horaSalida,
-                    );
-                    if (t != null) setState(() => _horaSalida = t);
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Hora de salida',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.access_time),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Vehículo',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.directions_car),
+                      ),
+                      initialValue: _vehiculo?.id,
+                      items: vehiculos
+                          .map((v) => DropdownMenuItem(
+                                value: v.id,
+                                child: Text(
+                                    '${v.placa} — ${v.conductorNombre}'),
+                              ))
+                          .toList(),
+                      onChanged: (id) {
+                        final sel =
+                            vehiculos.firstWhere((v) => v.id == id);
+                        setState(() {
+                          _vehiculo = sel;
+                          _capacidadCtrl.text =
+                              formatNum(sel.capacidadKg);
+                        });
+                      },
+                      validator: (v) =>
+                          v == null ? 'Selecciona un vehículo' : null,
                     ),
-                    child: Text(_horaSalidaStr),
-                  ),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 20),
 
-            // â”€â”€ SecciÃ³n 2: Destino y fechas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            _SectionTitle(
-                icon: Icons.location_on, label: 'Destino y Fechas'),
-            const SizedBox(height: 12),
+                    if (_vehiculo != null) ...[
+                      const SizedBox(height: 8),
+                      _InfoChip(children: [
+                        _InfoRow(
+                            icon: Icons.badge,
+                            label: 'CC',
+                            value: _vehiculo!.conductorCedula),
+                        _InfoRow(
+                            icon: Icons.phone,
+                            label: 'Cel.',
+                            value: _vehiculo!.conductorCelular),
+                      ]),
+                    ],
+                    const SizedBox(height: 12),
 
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Destino',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.store),
-              ),
-              initialValue: _destino?.id,
-              items: destinos
-                  .map((d) => DropdownMenuItem(
-                        value: d.id,
-                        child: Text(d.nombre),
-                      ))
-                  .toList(),
-              onChanged: (id) => setState(
-                  () => _destino = destinos.firstWhere((d) => d.id == id)),
-              validator: (v) =>
-                  v == null ? 'Selecciona un destino' : null,
-            ),
+                    Row(children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _capacidadCtrl,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(
+                                  decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.,]')),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Capacidad',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.scale),
+                            suffixText: 'kg',
+                          ),
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Requerido';
+                            if (double.tryParse(
+                                    v.replaceAll(',', '.')) ==
+                                null) {
+                              return 'Inválido';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final t = await showTimePicker(
+                              context: context,
+                              initialTime: _horaSalida,
+                            );
+                            if (t != null) {
+                              setState(() => _horaSalida = t);
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Hora de salida',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.access_time),
+                            ),
+                            child: Text(_horaSalidaStr),
+                          ),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 20),
 
-            if (_destino != null) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: cs.secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _InfoRow(
+                    // ── Sección 2: Destino y fechas ────────────────────
+                    _SectionTitle(
                         icon: Icons.location_on,
-                        label: 'Dir.',
-                        value: _destino!.direccion),
-                    _InfoRow(
-                        icon: Icons.location_city,
-                        label: 'Ciudad',
-                        value:
-                            '${_destino!.municipio}, ${_destino!.departamento}'),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
+                        label: 'Destino y Fechas'),
+                    const SizedBox(height: 12),
 
-            Row(children: [
-              Expanded(
-                child: _DateField(
-                  label: 'Fecha de despacho',
-                  date: _fechaDespacho,
-                  onPicked: (d) => setState(() => _fechaDespacho = d),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _DateField(
-                  label: 'Fecha de beneficio',
-                  date: _fechaBeneficio,
-                  onPicked: (d) => setState(() => _fechaBeneficio = d),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 20),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Destino',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.store),
+                      ),
+                      initialValue: _destino?.id,
+                      items: destinos
+                          .map((d) => DropdownMenuItem(
+                                value: d.id,
+                                child: Text(d.nombre),
+                              ))
+                          .toList(),
+                      onChanged: (id) => setState(() =>
+                          _destino =
+                              destinos.firstWhere((d) => d.id == id)),
+                      validator: (v) =>
+                          v == null ? 'Selecciona un destino' : null,
+                    ),
 
-            // â”€â”€ SecciÃ³n 3: Datos adicionales â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            _SectionTitle(
-                icon: Icons.info_outline, label: 'Datos adicionales'),
-            const SizedBox(height: 12),
+                    if (_destino != null) ...[
+                      const SizedBox(height: 8),
+                      _InfoChip(children: [
+                        _InfoRow(
+                            icon: Icons.location_on,
+                            label: 'Dir.',
+                            value: _destino!.direccion),
+                        _InfoRow(
+                            icon: Icons.location_city,
+                            label: 'Ciudad',
+                            value:
+                                '${_destino!.municipio}, ${_destino!.departamento}'),
+                      ]),
+                    ],
+                    const SizedBox(height: 12),
 
-            Row(children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _guiaCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'GuÃ­a NÂ°',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.numbers),
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Campo requerido'
-                          : null,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  controller: _precintoCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'NÂ° Precinto',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock_outline),
-                  ),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
+                    Row(children: [
+                      Expanded(
+                        child: _DateField(
+                          label: 'Fecha de despacho',
+                          date: _fechaDespacho,
+                          onPicked: (d) =>
+                              setState(() => _fechaDespacho = d),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _DateField(
+                          label: 'Fecha de beneficio',
+                          date: _fechaBeneficio,
+                          onPicked: (d) =>
+                              setState(() => _fechaBeneficio = d),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 20),
 
-            Row(children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _tempCanalCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Temp. Canal (Â°C)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.thermostat),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: _tempMenudCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Temp. Menud. (Â°C)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.thermostat),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: _tempPreCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Temp. Pre-enf. (Â°C)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.thermostat),
-                  ),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 20),
+                    // ── Sección 3: Datos adicionales ───────────────────
+                    _SectionTitle(
+                        icon: Icons.info_outline,
+                        label: 'Datos adicionales'),
+                    const SizedBox(height: 12),
 
-            // â”€â”€ SecciÃ³n 4: LÃ­neas de producto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            _SectionTitle(
-                icon: Icons.list_alt, label: 'LÃ­neas de producto'),
-            const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _guiaCtrl,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Guía N°',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.numbers),
+                          ),
+                          validator: (v) =>
+                              (v == null || v.trim().isEmpty)
+                                  ? 'Campo requerido'
+                                  : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _precintoCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'N° Precinto',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.lock_outline),
+                          ),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
 
-            if (_lineas.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  'Sin lÃ­neas agregadas. Usa el botÃ³n para aÃ±adir productos.',
-                  style: TextStyle(color: cs.onSurfaceVariant),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              ..._lineas.asMap().entries.map((e) {
-                final idx = e.key;
-                final l = e.value;
-                return Card(
-                  child: ListTile(
-                    dense: true,
-                    leading: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: l.rangoTipo == kTipoAves
-                          ? cs.primaryContainer
-                          : cs.tertiaryContainer,
-                      child: Icon(
-                        l.rangoTipo == kTipoAves
-                            ? Icons.set_meal
-                            : Icons.restaurant,
-                        size: 14,
-                        color: l.rangoTipo == kTipoAves
-                            ? cs.onPrimaryContainer
-                            : cs.onTertiaryContainer,
+                    Row(children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _tempCanalCtrl,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(
+                                  decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Temp. Canal (°C)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.thermostat),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _tempMenudCtrl,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(
+                                  decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Temp. Menud. (°C)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.thermostat),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _tempPreCtrl,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(
+                                  decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Temp. Pre-enf. (°C)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.thermostat),
+                          ),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
+
+                    // ── Foto del precinto ──────────────────────────────
+                    _PrecintoFotoWidget(
+                      fotoBytes: _fotoBytes,
+                      onTap: _showFotoOptions,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Sección 4: Líneas de producto ──────────────────
+                    _SectionTitle(
+                        icon: Icons.list_alt, label: 'Líneas de producto'),
+                    const SizedBox(height: 8),
+
+                    if (_lineas.isEmpty)
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'Sin líneas agregadas. Usa el botón para añadir productos.',
+                          style:
+                              TextStyle(color: cs.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    else
+                      ..._lineas.asMap().entries.map((e) {
+                        final idx = e.key;
+                        final l = e.value;
+                        return Card(
+                          child: ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              radius: 14,
+                              backgroundColor:
+                                  l.rangoTipo == kTipoAves
+                                      ? cs.primaryContainer
+                                      : cs.tertiaryContainer,
+                              child: Icon(
+                                l.rangoTipo == kTipoAves
+                                    ? Icons.set_meal
+                                    : Icons.restaurant,
+                                size: 14,
+                                color: l.rangoTipo == kTipoAves
+                                    ? cs.onPrimaryContainer
+                                    : cs.onTertiaryContainer,
+                              ),
+                            ),
+                            title: Text(
+                                '${l.clienteNombre} · ${l.rangoNombre}',
+                                style: const TextStyle(fontSize: 13)),
+                            subtitle: Text(
+                              '${formatNum(l.canastillas)} canast. · '
+                              '${formatNum(l.unidades)} unid. · '
+                              '${formatKg(l.peso)}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Colors.red,
+                                  size: 20),
+                              onPressed: () => setState(
+                                  () => _lineas.removeAt(idx)),
+                            ),
+                          ),
+                        );
+                      }),
+
+                    if (_lineas.isNotEmpty) ...[
+                      const Divider(),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Total: '
+                            '${formatNum(_lineas.fold(0, (s, l) => s + l.canastillas))} canast. · '
+                            '${formatNum(_lineas.fold(0, (s, l) => s + l.unidades))} unid. · '
+                            '${formatKg(_lineas.fold(0.0, (s, l) => s + l.peso))}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          _showAgregarLineaDialog(context),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar línea de producto'),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── Botón confirmar ────────────────────────────────
+                    FilledButton.icon(
+                      onPressed:
+                          (_submitting || _despachado) ? null : _confirmar,
+                      icon: _submitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white))
+                          : const Icon(Icons.check_circle_outline),
+                      label: const Text('Confirmar Despacho'),
+                      style: FilledButton.styleFrom(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
-                    title: Text(
-                        '${l.clienteNombre} Â· ${l.rangoNombre}',
-                        style: const TextStyle(fontSize: 13)),
-                    subtitle: Text(
-                      '${formatNum(l.canastillas)} canast. Â· '
-                      '${formatNum(l.unidades)} unid. Â· '
-                      '${formatKg(l.peso)}',
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.remove_circle_outline,
-                          color: Colors.red, size: 20),
-                      onPressed: () =>
-                          setState(() => _lineas.removeAt(idx)),
-                    ),
-                  ),
-                );
-              }),
-
-            // Total acumulado
-            if (_lineas.isNotEmpty) ...[
-              const Divider(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    'Total: '
-                    '${formatNum(_lineas.fold(0, (s, l) => s + l.canastillas))} canast. Â· '
-                    '${formatNum(_lineas.fold(0, (s, l) => s + l.unidades))} unid. Â· '
-                    '${formatKg(_lineas.fold(0.0, (s, l) => s + l.peso))}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 8),
-
-            OutlinedButton.icon(
-              onPressed: () => _showAgregarLineaDialog(context),
-              icon: const Icon(Icons.add),
-              label: const Text('Agregar lÃ­nea de producto'),
-            ),
-            const SizedBox(height: 24),
-
-            // â”€â”€ BotÃ³n confirmar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            FilledButton.icon(
-              onPressed: _submitting ? null : _confirmar,
-              icon: _submitting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.check_circle_outline),
-              label: const Text('Confirmar Despacho'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  // â”€â”€ Dialog para agregar una lÃ­nea â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Dialog para agregar una línea ─────────────────────────────────────────
 
   void _showAgregarLineaDialog(BuildContext context) {
     final clientes = context.read<List<Cliente>>();
@@ -550,7 +723,153 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   }
 }
 
-// â”€â”€ Dialog para seleccionar cliente, rango y cantidades â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Banner de éxito ──────────────────────────────────────────────────────────
+
+class _SuccessBanner extends StatelessWidget {
+  final String guiaNro;
+  final VoidCallback onVerGuia;
+  final VoidCallback onNuevoDespacho;
+
+  const _SuccessBanner({
+    required this.guiaNro,
+    required this.onVerGuia,
+    required this.onNuevoDespacho,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Colors.green.shade50,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: Colors.green.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.check_circle,
+                    color: Colors.green, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Despacho confirmado',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: Colors.green),
+                      ),
+                      Text(
+                        'Guía N° $guiaNro enviada correctamente.',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onVerGuia,
+                    icon: const Icon(Icons.receipt_long, size: 18),
+                    label: const Text('Ver guía'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.green.shade700,
+                      side: BorderSide(color: Colors.green.shade400),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: onNuevoDespacho,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Nuevo despacho'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Widget de foto del precinto ───────────────────────────────────────────────
+
+class _PrecintoFotoWidget extends StatelessWidget {
+  final Uint8List? fotoBytes;
+  final VoidCallback onTap;
+
+  const _PrecintoFotoWidget({
+    required this.fotoBytes,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (fotoBytes == null) {
+      return OutlinedButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.add_a_photo_outlined),
+        label: const Text('Adjuntar foto del precinto'),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.memory(
+            fotoBytes!,
+            height: 180,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(Icons.lock, size: 14, color: cs.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text('Foto del precinto adjunta',
+                  style: TextStyle(
+                      fontSize: 12, color: cs.onSurfaceVariant)),
+            ),
+            TextButton.icon(
+              onPressed: onTap,
+              icon: const Icon(Icons.edit, size: 16),
+              label: const Text('Cambiar'),
+              style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Dialog para seleccionar cliente, rango y cantidades ──────────────────────
 
 class _AgregarLineaDialog extends StatefulWidget {
   final List<Cliente> clientes;
@@ -598,9 +917,10 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final saldo = _saldo;
+    final esAves = _rango?.tipo == kTipoAves;
 
     return AlertDialog(
-      title: const Text('Agregar lÃ­nea'),
+      title: const Text('Agregar línea'),
       content: SizedBox(
         width: 360,
         child: SingleChildScrollView(
@@ -630,25 +950,35 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                 ),
                 const SizedBox(height: 12),
 
-                // Rango (stream)
+                // Rango (stream filtrado por stock)
                 if (_clienteId != null)
                   StreamBuilder<List<Rango>>(
                     stream: FirestoreService.instance
                         .rangosStream(_clienteId!)
-                        .map((rs) => rs
-                            .where((r) {
+                        .map((rs) => rs.where((r) {
                               final s = widget.saldoMap[
                                   '$_clienteId|${r.id}'];
                               return s != null &&
-                                  (s.canastillas > 0 ||
-                                      s.unidades > 0);
-                            })
-                            .toList()),
+                                  (s.canastillas > 0 || s.unidades > 0);
+                            }).toList()),
                     builder: (_, snap) {
                       final rangos = snap.data ?? [];
-                      final val = rangos.any((r) => r.id == _rango?.id)
-                          ? _rango?.id
-                          : null;
+                      final val =
+                          rangos.any((r) => r.id == _rango?.id)
+                              ? _rango?.id
+                              : null;
+                      if (rangos.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 8),
+                          child: Text(
+                            'Sin rangos con inventario disponible.',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurfaceVariant),
+                          ),
+                        );
+                      }
                       return DropdownButtonFormField<String>(
                         decoration: const InputDecoration(
                           labelText: 'Rango',
@@ -663,7 +993,8 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                                 ))
                             .toList(),
                         onChanged: (id) => setState(() {
-                          _rango = rangos.firstWhere((r) => r.id == id);
+                          _rango =
+                              rangos.firstWhere((r) => r.id == id);
                           _esCola = false;
                           _canCtrl.clear();
                           _pesoCtrl.clear();
@@ -692,8 +1023,8 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Disponible: ${formatNum(saldo.canastillas)} canast. Â· '
-                            '${formatNum(saldo.unidades)} unid. Â· '
+                            'Disponible: ${formatNum(saldo.canastillas)} canast. · '
+                            '${formatNum(saldo.unidades)} unid. · '
                             '${formatKg(saldo.peso)}',
                             style: TextStyle(
                                 fontSize: 11,
@@ -704,97 +1035,92 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
 
-                // Toggle cola (solo aves)
-                if (_rango?.esAves == true)
+                // Toggle Cola (solo aves)
+                if (_rango != null && esAves) ...[
+                  const SizedBox(height: 8),
                   SwitchListTile(
-                    title: const Text('Tipo Cola'),
+                    dense: true,
+                    title: const Text('Es Cola',
+                        style: TextStyle(fontSize: 13)),
                     value: _esCola,
                     onChanged: (v) => setState(() {
                       _esCola = v;
                       _canCtrl.clear();
                     }),
-                    dense: true,
                   ),
+                ],
 
-                // Canastillas / unidades
-                TextFormField(
-                  controller: _canCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly
-                  ],
-                  decoration: InputDecoration(
-                    labelText:
-                        _esCola ? 'Unidades (cola)' : 'Canastillas',
-                    border: const OutlineInputBorder(),
-                    prefixIcon:
-                        Icon(_esCola ? Icons.numbers : Icons.shopping_basket),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Requerido';
-                    final n = int.tryParse(v) ?? 0;
-                    if (n <= 0) return 'Debe ser > 0';
-                    if (saldo != null) {
-                      final max =
-                          _esCola ? saldo.unidades : saldo.canastillas;
-                      if (n > max) {
-                        return 'MÃ¡x: ${formatNum(max)}';
-                      }
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Peso
-                TextFormField(
-                  controller: _pesoCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'[0-9.,]')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Peso (kg)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.scale),
-                    suffixText: 'kg',
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Requerido';
-                    final n = double.tryParse(v.replaceAll(',', '.'));
-                    if (n == null || n <= 0) return 'InvÃ¡lido';
-                    if (saldo != null && n > saldo.peso) {
-                      return 'MÃ¡x: ${formatKg(saldo.peso)}';
-                    }
-                    return null;
-                  },
-                ),
-
-                // Preview unidades
-                if (_rango != null && _canastillas > 0) ...[
+                if (_rango != null) ...[
                   const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(6),
+                  // Canastillas / Unidades
+                  TextFormField(
+                    controller: _canCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly
+                    ],
+                    decoration: InputDecoration(
+                      labelText: _esCola
+                          ? 'Unidades de cola'
+                          : 'Canastillas',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.grid_on),
                     ),
-                    child: Text(
-                      _esCola
-                          ? '${formatNum(_canastillas)} unidades de cola'
-                          : '${formatNum(_canastillas)} canast. â†’ '
-                              '${formatNum(_unidades)} unid.',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: cs.onPrimaryContainer),
+                    onChanged: (_) => setState(() {}),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Requerido';
+                      final n = int.tryParse(v);
+                      if (n == null || n <= 0) return 'Valor inválido';
+                      if (saldo != null) {
+                        if (_esCola && n > saldo.unidades) {
+                          return 'Máx. ${saldo.unidades} unid.';
+                        }
+                        if (!_esCola && n > saldo.canastillas) {
+                          return 'Máx. ${saldo.canastillas} canast.';
+                        }
+                      }
+                      return null;
+                    },
+                  ),
+
+                  // Preview unidades (solo aves no-cola)
+                  if (esAves && !_esCola && _canastillas > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '→ ${formatNum(_unidades)} unidades a despachar',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: cs.primary,
+                            fontWeight: FontWeight.w500),
+                      ),
                     ),
+
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _pesoCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'[0-9.,]'))
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Peso (kg)',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.scale),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Requerido';
+                      final n =
+                          double.tryParse(v.replaceAll(',', '.'));
+                      if (n == null || n <= 0) return 'Valor inválido';
+                      if (saldo != null && n > saldo.peso + 0.001) {
+                        return 'Máx. ${formatKg(saldo.peso)}';
+                      }
+                      return null;
+                    },
                   ),
                 ],
               ],
@@ -808,26 +1134,29 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: () {
-            if (!_formKey.currentState!.validate()) return;
-            if (_rango == null) return;
-            final cliente = widget.clientes
-                .firstWhere((c) => c.id == _clienteId);
-            final canastillas = _esCola ? 1 : _canastillas;
-            widget.onAgregar(DespachoLinea(
-              clienteId: cliente.id,
-              clienteNombre: cliente.nombre,
-              rangoId: _rango!.id,
-              rangoNombre: _rango!.nombre,
-              rangoTipo: _rango!.tipo,
-              canastillas: canastillas,
-              unidades: _unidades,
-              peso: double.parse(
-                  _pesoCtrl.text.replaceAll(',', '.')),
-              esCola: _esCola,
-            ));
-            Navigator.pop(context);
-          },
+          onPressed: _rango == null
+              ? null
+              : () {
+                  if (!_formKey.currentState!.validate()) return;
+                  final peso = double.parse(
+                      _pesoCtrl.text.replaceAll(',', '.'));
+                  widget.onAgregar(
+                    DespachoLinea(
+                      clienteId: _clienteId!,
+                      clienteNombre: widget.clientes
+                          .firstWhere((c) => c.id == _clienteId)
+                          .nombre,
+                      rangoId: _rango!.id,
+                      rangoNombre: _rango!.nombre,
+                      rangoTipo: _rango!.tipo,
+                      canastillas: _esCola ? 1 : _canastillas,
+                      unidades: _unidades,
+                      peso: peso,
+                      esCola: _esCola,
+                    ),
+                  );
+                  Navigator.pop(context);
+                },
           child: const Text('Agregar'),
         ),
       ],
@@ -835,7 +1164,7 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
   }
 }
 
-// â”€â”€ Widgets auxiliares â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Widgets auxiliares ────────────────────────────────────────────────────────
 
 class _SectionTitle extends StatelessWidget {
   final IconData icon;
@@ -852,11 +1181,31 @@ class _SectionTitle extends StatelessWidget {
         Text(label,
             style: TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: 15,
                 color: cs.primary)),
         const SizedBox(width: 8),
-        Expanded(child: Divider(color: cs.primary.withValues(alpha: 0.3))),
+        Expanded(child: Divider(color: cs.outlineVariant)),
       ],
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final List<Widget> children;
+  const _InfoChip({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children),
     );
   }
 }
@@ -871,22 +1220,21 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(icon, size: 12, color: cs.onSecondaryContainer),
-          const SizedBox(width: 4),
-          Text('$label ', style: TextStyle(fontSize: 11, color: cs.onSecondaryContainer)),
-          Expanded(
-            child: Text(value,
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: cs.onSecondaryContainer)),
-          ),
-        ],
-      ),
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: cs.onSecondaryContainer),
+        const SizedBox(width: 4),
+        Text('$label  ',
+            style: TextStyle(
+                fontSize: 12, color: cs.onSecondaryContainer)),
+        Expanded(
+          child: Text(value,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSecondaryContainer)),
+        ),
+      ],
     );
   }
 }
@@ -902,13 +1250,13 @@ class _DateField extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () async {
-        final picked = await showDatePicker(
+        final d = await showDatePicker(
           context: context,
           initialDate: date,
-          firstDate: DateTime(2024),
-          lastDate: DateTime.now().add(const Duration(days: 1)),
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2030),
         );
-        if (picked != null) onPicked(picked);
+        if (d != null) onPicked(d);
       },
       child: InputDecorator(
         decoration: InputDecoration(

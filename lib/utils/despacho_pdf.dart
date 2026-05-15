@@ -1,5 +1,6 @@
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../models/despacho.dart';
 import '../models/empresa_config.dart';
 import 'formatters.dart';
@@ -7,6 +8,16 @@ import 'formatters.dart';
 /// Construye el documento PDF de la guía de despacho.
 Future<pw.Document> buildDespachoPdf(
     Despacho d, EmpresaConfig empresa) async {
+  // Cargar imagen del precinto si existe
+  pw.ImageProvider? precintoImg;
+  if (d.precintoFotoUrl != null && d.precintoFotoUrl!.isNotEmpty) {
+    try {
+      precintoImg = await networkImage(d.precintoFotoUrl!);
+    } catch (_) {
+      // Si falla la descarga, continúa sin imagen
+    }
+  }
+
   final doc = pw.Document();
 
   doc.addPage(
@@ -23,6 +34,10 @@ Future<pw.Document> buildDespachoPdf(
           _infoGrid(d),
           pw.SizedBox(height: 10),
           _lineasTable(d),
+          if (precintoImg != null) ...[
+            pw.SizedBox(height: 10),
+            _precintoSection(precintoImg),
+          ],
           pw.SizedBox(height: 16),
           _firmas(),
         ],
@@ -193,6 +208,28 @@ pw.Widget _lineasTable(Despacho d) {
           _cell(formatNum(d.totalUnidades), totalStyle),
           _cell(formatNum(d.totalPeso), totalStyle),
         ],
+      ),
+    ],
+  );
+}
+
+// ── Foto del precinto ───────────────────────────────────────────────────────
+
+pw.Widget _precintoSection(pw.ImageProvider img) {
+  final boldSm = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8);
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Text('FOTO PRECINTO DE SEGURIDAD', style: boldSm),
+      pw.SizedBox(height: 4),
+      pw.Container(
+        height: 120,
+        decoration: const pw.BoxDecoration(
+          border: pw.Border.fromBorderSide(pw.BorderSide(width: 0.5)),
+        ),
+        child: pw.Center(
+          child: pw.Image(img, fit: pw.BoxFit.contain),
+        ),
       ),
     ],
   );

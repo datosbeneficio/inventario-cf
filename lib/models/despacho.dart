@@ -81,6 +81,7 @@ class Despacho {
   final String tempPreEnfriamiento;
   final List<DespachoLinea> lineas;
   final DateTime timestamp;
+  final String? precintoFotoUrl;
 
   const Despacho({
     required this.id,
@@ -105,6 +106,7 @@ class Despacho {
     required this.tempPreEnfriamiento,
     required this.lineas,
     required this.timestamp,
+    this.precintoFotoUrl,
   });
 
   factory Despacho.fromDoc(DocumentSnapshot doc) {
@@ -141,6 +143,7 @@ class Despacho {
       timestamp: d['timestamp'] != null
           ? (d['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
+      precintoFotoUrl: d['precintoFotoUrl'] as String?,
     );
   }
 
@@ -166,6 +169,7 @@ class Despacho {
         'tempPreEnfriamiento': tempPreEnfriamiento,
         'lineas': lineas.map((l) => l.toMap()).toList(),
         'timestamp': FieldValue.serverTimestamp(),
+        if (precintoFotoUrl != null) 'precintoFotoUrl': precintoFotoUrl,
       };
 
   // Totales calculados

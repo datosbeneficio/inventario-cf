@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import '../models/cliente.dart';
 import '../models/rango.dart';
 import '../models/ingreso.dart';
@@ -273,16 +275,37 @@ class FirestoreService {
       .snapshots()
       .map((s) => s.docs.map(Despacho.fromDoc).toList());
 
+  /// Genera un nuevo ID para un despacho sin crearlo aún.
+  String newDespachoId() => _db.collection('despachos').doc().id;
+
+  /// Sube la foto del precinto a Firebase Storage y retorna la URL pública.
+  Future<String> uploadPrecintoFoto(
+      String despachoId, Uint8List bytes, String ext) async {
+    final ref = FirebaseStorage.instance
+        .ref('despachos/$despachoId/precinto.$ext');
+    await ref.putData(
+      bytes,
+      SettableMetadata(contentType: 'image/$ext'),
+    );
+    return await ref.getDownloadURL();
+  }
+
   /// Crea el documento de despacho y todas las salidas en un único batch.
-  Future<void> addDespacho(Despacho despacho) async {
+  /// Si se pasa [predefinedId], usa ese ID en lugar de generar uno nuevo.
+  /// Retorna el ID del documento creado.
+  Future<String> addDespacho(Despacho despacho,
+      {String? predefinedId}) async {
     final batch = _db.batch();
-    final despachoRef = _db.collection('despachos').doc();
+    final despachoRef = predefinedId != null
+        ? _db.collection('despachos').doc(predefinedId)
+        : _db.collection('despachos').doc();
     batch.set(despachoRef, despacho.toMap());
     for (final linea in despacho.lineas) {
       final salidaRef = _db.collection('salidas').doc();
       batch.set(salidaRef, linea.toSalidaMap(despachoRef.id));
     }
     await batch.commit();
+    return despachoRef.id;
   }
 
   Future<void> deleteDespacho(String despachoId) async {
