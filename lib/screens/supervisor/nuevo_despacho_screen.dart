@@ -60,6 +60,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   bool _submitting = false;
   bool _despachado = false;
   Despacho? _ultimoDespacho;
+  /// Se activa al intentar confirmar sin fechas de vencimiento seleccionadas.
+  bool _mostrarErrorVenc = false;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -124,6 +126,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       _loteMenudCtrl.clear();
       _vencimientoPollo = null;
       _vencimientoMenudencias = null;
+      _mostrarErrorVenc = false;
       _fotoBytes = null;
       _fotoExt = 'jpg';
       _lineas.clear();
@@ -216,7 +219,15 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   // ── Confirmar ─────────────────────────────────────────────────────────────
 
   Future<void> _confirmar() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validar fechas de vencimiento (no participan en el Form)
+    final faltanVenc =
+        _vencimientoPollo == null || _vencimientoMenudencias == null;
+    if (faltanVenc) {
+      setState(() => _mostrarErrorVenc = true);
+    }
+
+    if (!_formKey.currentState!.validate() || faltanVenc) return;
+
     if (_vehiculo == null) {
       _showError('Selecciona un vehículo');
       return;
@@ -613,23 +624,35 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                           controller: _lotePolloCtrl,
                           textCapitalization: TextCapitalization.characters,
                           decoration: const InputDecoration(
-                            labelText: 'Lote Pollo en Canal',
+                            labelText: 'Lote Pollo en Canal *',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.tag),
                           ),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Campo obligatorio (INVIMA)'
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _DateField(
-                          label: 'Vence Pollo',
+                          label: 'Vencimiento Pollo *',
                           date: _vencimientoPollo,
                           onPicked: (d) =>
                               setState(() => _vencimientoPollo = d),
-                          nullable: true,
+                          hasError: _mostrarErrorVenc &&
+                              _vencimientoPollo == null,
                         ),
                       ),
                     ]),
+                    if (_mostrarErrorVenc && _vencimientoPollo == null)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4, left: 4),
+                        child: Text(
+                          'Selecciona la fecha de vencimiento del Pollo',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
                     const SizedBox(height: 12),
 
                     // Menudencias
@@ -639,23 +662,35 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                           controller: _loteMenudCtrl,
                           textCapitalization: TextCapitalization.characters,
                           decoration: const InputDecoration(
-                            labelText: 'Lote Menudencias',
+                            labelText: 'Lote Menudencias *',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.tag),
                           ),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Campo obligatorio (INVIMA)'
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _DateField(
-                          label: 'Vence Menudencias',
+                          label: 'Vencimiento Menudencias *',
                           date: _vencimientoMenudencias,
                           onPicked: (d) =>
                               setState(() => _vencimientoMenudencias = d),
-                          nullable: true,
+                          hasError: _mostrarErrorVenc &&
+                              _vencimientoMenudencias == null,
                         ),
                       ),
                     ]),
+                    if (_mostrarErrorVenc && _vencimientoMenudencias == null)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4, left: 4),
+                        child: Text(
+                          'Selecciona la fecha de vencimiento de Menudencias',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
                     const SizedBox(height: 12),
 
                     // ── Observaciones ─────────────────────────────────
@@ -1365,17 +1400,18 @@ class _DateField extends StatelessWidget {
   final String label;
   final DateTime? date;
   final void Function(DateTime) onPicked;
-  /// Si true, la fecha es opcional y puede ser null (muestra placeholder).
-  final bool nullable;
+  /// Cuando true muestra borde y texto en rojo (validación fallida).
+  final bool hasError;
   const _DateField({
     required this.label,
     required this.date,
     required this.onPicked,
-    this.nullable = false,
+    this.hasError = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final errorColor = Theme.of(context).colorScheme.error;
     return InkWell(
       onTap: () async {
         final d = await showDatePicker(
@@ -1390,10 +1426,19 @@ class _DateField extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
-          prefixIcon: const Icon(Icons.calendar_today),
+          enabledBorder: hasError
+              ? OutlineInputBorder(
+                  borderSide: BorderSide(color: errorColor, width: 2))
+              : const OutlineInputBorder(),
+          labelStyle: hasError ? TextStyle(color: errorColor) : null,
+          prefixIcon: Icon(Icons.calendar_today,
+              color: hasError ? errorColor : null),
         ),
         child: Text(
-          date != null ? formatDate(date!) : (nullable ? '—' : ''),
+          date != null ? formatDate(date!) : '—',
+          style: hasError && date == null
+              ? TextStyle(color: errorColor)
+              : null,
         ),
       ),
     );

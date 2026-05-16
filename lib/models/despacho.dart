@@ -114,6 +114,8 @@ class Despacho {
     this.vencimientoPollo,
     this.loteMenudencias = '',
     this.vencimientoMenudencias,
+    // Nota: en el formulario estos campos son obligatorios (INVIMA).
+    // Los defaults vacíos/null solo aplican a documentos históricos.
     required this.lineas,
     required this.timestamp,
     this.precintoFotoUrl,
@@ -187,10 +189,10 @@ class Despacho {
         'tempCanal': tempCanal,
         'tempMenudencias': tempMenudencias,
         'tempPreEnfriamiento': tempPreEnfriamiento,
-        if (lotePollo.isNotEmpty) 'lotePollo': lotePollo,
+        'lotePollo': lotePollo,
         if (vencimientoPollo != null)
           'vencimientoPollo': Timestamp.fromDate(vencimientoPollo!),
-        if (loteMenudencias.isNotEmpty) 'loteMenudencias': loteMenudencias,
+        'loteMenudencias': loteMenudencias,
         if (vencimientoMenudencias != null)
           'vencimientoMenudencias': Timestamp.fromDate(vencimientoMenudencias!),
         'lineas': lineas.map((l) => l.toMap()).toList(),
