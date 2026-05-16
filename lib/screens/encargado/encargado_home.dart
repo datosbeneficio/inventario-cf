@@ -5,19 +5,29 @@ import '../../models/cliente.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/entrada_form.dart';
+import '../../widgets/inventario_panel.dart';
 import '../../widgets/movimiento_tile.dart';
 import '../../widgets/confirm_delete_dialog.dart';
 import '../../utils/formatters.dart';
 import '../../utils/constants.dart';
 
-class EncargadoHome extends StatelessWidget {
+class EncargadoHome extends StatefulWidget {
   const EncargadoHome({super.key});
+
+  @override
+  State<EncargadoHome> createState() => _EncargadoHomeState();
+}
+
+class _EncargadoHomeState extends State<EncargadoHome> {
+  int _tab = 0;
+
+  static const _titles = ['Inventario Aves', 'Registrar Ingreso'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Encargado Cuarto Frío'),
+        title: Text(_titles[_tab]),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -26,51 +36,61 @@ class EncargadoHome extends StatelessWidget {
           ),
         ],
       ),
-      body: const _EncargadoBody(),
+      body: IndexedStack(
+        index: _tab,
+        children: const [
+          InventarioPanel(soloTipo: kTipoAves),
+          _IngresoAvesBody(),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (i) => setState(() => _tab = i),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.inventory_2), label: 'Inventario'),
+          NavigationDestination(
+              icon: Icon(Icons.add_box), label: 'Registrar'),
+        ],
+      ),
     );
   }
 }
 
-class _EncargadoBody extends StatelessWidget {
-  const _EncargadoBody();
+// ── Pestaña de registro de ingreso de aves ────────────────────────────────
+
+class _IngresoAvesBody extends StatelessWidget {
+  const _IngresoAvesBody();
 
   @override
   Widget build(BuildContext context) {
     final todos = context.watch<List<Ingreso>>();
-    final hoy = _porFecha(todos, DateTime.now());
+    final hoy = todos
+        .where((i) =>
+            i.rangoTipo == kTipoAves &&
+            i.timestamp.year == DateTime.now().year &&
+            i.timestamp.month == DateTime.now().month &&
+            i.timestamp.day == DateTime.now().day)
+        .toList();
 
     return LayoutBuilder(
       builder: (ctx, constraints) {
+        final form = _FormPanel();
+        final list = _ListaIngresos(ingresos: hoy);
         if (constraints.maxWidth >= 700) {
-          return Row(
-            children: [
-              SizedBox(width: 380, child: _FormPanel()),
-              const VerticalDivider(width: 1),
-              Expanded(child: _ListaIngresos(ingresos: hoy)),
-            ],
-          );
+          return Row(children: [
+            SizedBox(width: 380, child: form),
+            const VerticalDivider(width: 1),
+            Expanded(child: list),
+          ]);
         }
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: _FormPanel(),
-            ),
-            const Divider(),
-            Expanded(child: _ListaIngresos(ingresos: hoy)),
-          ],
-        );
+        return Column(children: [
+          Padding(padding: const EdgeInsets.all(16), child: form),
+          const Divider(),
+          Expanded(child: list),
+        ]);
       },
     );
-  }
-
-  List<Ingreso> _porFecha(List<Ingreso> todos, DateTime fecha) {
-    return todos
-        .where((i) =>
-            i.timestamp.year == fecha.year &&
-            i.timestamp.month == fecha.month &&
-            i.timestamp.day == fecha.day)
-        .toList();
   }
 }
 
@@ -132,8 +152,11 @@ class _ListaIngresos extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (ingresos.isEmpty) {
-      return const Center(child: Text('Sin ingresos hoy'));
+      return const Center(child: Text('Sin ingresos de aves hoy'));
     }
+
+    final totalUnid = ingresos.fold(0, (s, i) => s + i.unidades);
+    final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
 
     return Column(
       children: [
@@ -144,9 +167,14 @@ class _ListaIngresos extends StatelessWidget {
               Text('Ingresos de hoy (${ingresos.length})',
                   style: const TextStyle(fontWeight: FontWeight.bold)),
               const Spacer(),
-              Text(
-                'Total: ${formatNum(ingresos.fold(0, (s, i) => s + i.unidades))} unid.',
-                style: const TextStyle(fontSize: 13),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('${formatNum(totalUnid)} unidades',
+                      style: const TextStyle(fontSize: 12)),
+                  Text(formatKg(totalPeso),
+                      style: const TextStyle(fontSize: 12)),
+                ],
               ),
             ],
           ),
