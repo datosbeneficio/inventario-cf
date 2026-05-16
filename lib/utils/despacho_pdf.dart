@@ -127,6 +127,13 @@ pw.Widget _idRow(Despacho d) {
 // ── Grid de datos del despacho ──────────────────────────────────────────────
 
 pw.Widget _infoGrid(Despacho d) {
+  final vencPollo = d.vencimientoPollo != null
+      ? formatDate(d.vencimientoPollo!)
+      : '';
+  final vencMenud = d.vencimientoMenudencias != null
+      ? formatDate(d.vencimientoMenudencias!)
+      : '';
+
   final rows = [
     ['FECHA DE DESPACHO:', formatDate(d.fechaDespacho), 'DIRECCIÓN DESTINO:', d.direccion],
     ['FECHA DE BENEFICIO:', formatDate(d.fechaBeneficio), 'MUNICIPIO Y DEPTO:', '${d.municipio}, ${d.departamento}'],
@@ -135,6 +142,8 @@ pw.Widget _infoGrid(Despacho d) {
     ['HORA SALIDA:', d.horaSalida, 'TEMP. PRE-ENFRIAM.:', d.tempPreEnfriamiento],
     ['CONDUCTOR:', d.conductorNombre, 'Nº PRECINTO:', d.precinto],
     ['CC / CEL:', '${d.conductorCedula} / ${d.conductorCelular}', '', ''],
+    ['LOTE POLLO EN CANAL:', d.lotePollo, 'VENCE POLLO:', vencPollo],
+    ['LOTE MENUDENCIAS:', d.loteMenudencias, 'VENCE MENUDENCIAS:', vencMenud],
   ];
 
   const labelStyle = pw.TextStyle(fontSize: 8);

@@ -79,6 +79,11 @@ class Despacho {
   final String tempCanal;
   final String tempMenudencias;
   final String tempPreEnfriamiento;
+  // ── Lotes de producción y vencimientos ──────────────────────────────────
+  final String lotePollo;
+  final DateTime? vencimientoPollo;
+  final String loteMenudencias;
+  final DateTime? vencimientoMenudencias;
   final List<DespachoLinea> lineas;
   final DateTime timestamp;
   final String? precintoFotoUrl;
@@ -105,6 +110,10 @@ class Despacho {
     required this.tempCanal,
     required this.tempMenudencias,
     required this.tempPreEnfriamiento,
+    this.lotePollo = '',
+    this.vencimientoPollo,
+    this.loteMenudencias = '',
+    this.vencimientoMenudencias,
     required this.lineas,
     required this.timestamp,
     this.precintoFotoUrl,
@@ -139,6 +148,14 @@ class Despacho {
       tempCanal: d['tempCanal'] ?? '',
       tempMenudencias: d['tempMenudencias'] ?? '',
       tempPreEnfriamiento: d['tempPreEnfriamiento'] ?? '',
+      lotePollo: d['lotePollo'] ?? '',
+      vencimientoPollo: d['vencimientoPollo'] != null
+          ? (d['vencimientoPollo'] as Timestamp).toDate()
+          : null,
+      loteMenudencias: d['loteMenudencias'] ?? '',
+      vencimientoMenudencias: d['vencimientoMenudencias'] != null
+          ? (d['vencimientoMenudencias'] as Timestamp).toDate()
+          : null,
       lineas: lineasRaw
           .map((l) => DespachoLinea.fromMap(l as Map<String, dynamic>))
           .toList(),
@@ -170,6 +187,12 @@ class Despacho {
         'tempCanal': tempCanal,
         'tempMenudencias': tempMenudencias,
         'tempPreEnfriamiento': tempPreEnfriamiento,
+        if (lotePollo.isNotEmpty) 'lotePollo': lotePollo,
+        if (vencimientoPollo != null)
+          'vencimientoPollo': Timestamp.fromDate(vencimientoPollo!),
+        if (loteMenudencias.isNotEmpty) 'loteMenudencias': loteMenudencias,
+        if (vencimientoMenudencias != null)
+          'vencimientoMenudencias': Timestamp.fromDate(vencimientoMenudencias!),
         'lineas': lineas.map((l) => l.toMap()).toList(),
         'timestamp': FieldValue.serverTimestamp(),
         if (precintoFotoUrl != null) 'precintoFotoUrl': precintoFotoUrl,

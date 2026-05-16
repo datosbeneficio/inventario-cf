@@ -257,6 +257,13 @@ class _InfoGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vencPollo = d.vencimientoPollo != null
+        ? formatDate(d.vencimientoPollo!)
+        : '';
+    final vencMenud = d.vencimientoMenudencias != null
+        ? formatDate(d.vencimientoMenudencias!)
+        : '';
+
     final rows = [
       ['Fecha despacho', formatDate(d.fechaDespacho),
         'Dirección destino', d.direccion],
@@ -272,6 +279,10 @@ class _InfoGrid extends StatelessWidget {
         'N° precinto', d.precinto],
       ['CC / Celular',
         '${d.conductorCedula} / ${d.conductorCelular}', '', ''],
+      ['Lote Pollo Canal', d.lotePollo,
+        'Vence Pollo', vencPollo],
+      ['Lote Menudencias', d.loteMenudencias,
+        'Vence Menudencias', vencMenud],
     ];
 
     return Table(

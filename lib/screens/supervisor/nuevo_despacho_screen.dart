@@ -43,6 +43,12 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   final _tempPreCtrl = TextEditingController();
   final _obsCtrl = TextEditingController();
 
+  // ── Lotes y vencimientos ─────────────────────────────────────────────────
+  final _lotePolloCtrl = TextEditingController();
+  final _loteMenudCtrl = TextEditingController();
+  DateTime? _vencimientoPollo;
+  DateTime? _vencimientoMenudencias;
+
   // ── Foto del precinto ────────────────────────────────────────────────────
   Uint8List? _fotoBytes;
   String _fotoExt = 'jpg';
@@ -73,6 +79,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     _tempMenudCtrl.dispose();
     _tempPreCtrl.dispose();
     _obsCtrl.dispose();
+    _lotePolloCtrl.dispose();
+    _loteMenudCtrl.dispose();
     super.dispose();
   }
 
@@ -112,6 +120,10 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       _tempMenudCtrl.clear();
       _tempPreCtrl.clear();
       _obsCtrl.clear();
+      _lotePolloCtrl.clear();
+      _loteMenudCtrl.clear();
+      _vencimientoPollo = null;
+      _vencimientoMenudencias = null;
       _fotoBytes = null;
       _fotoExt = 'jpg';
       _lineas.clear();
@@ -255,6 +267,10 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         tempCanal: _tempCanalCtrl.text.trim(),
         tempMenudencias: _tempMenudCtrl.text.trim(),
         tempPreEnfriamiento: _tempPreCtrl.text.trim(),
+        lotePollo: _lotePolloCtrl.text.trim(),
+        vencimientoPollo: _vencimientoPollo,
+        loteMenudencias: _loteMenudCtrl.text.trim(),
+        vencimientoMenudencias: _vencimientoMenudencias,
         observaciones: _obsCtrl.text.trim(),
         lineas: _lineas,
         timestamp: DateTime.now(),
@@ -577,6 +593,66 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.thermostat),
                           ),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
+
+                    const SizedBox(height: 20),
+
+                    // ── Sección 3b: Lotes y vencimientos ──────────────
+                    _SectionTitle(
+                        icon: Icons.qr_code_scanner,
+                        label: 'Lotes y Vencimientos'),
+                    const SizedBox(height: 12),
+
+                    // Pollo en Canal
+                    Row(children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _lotePolloCtrl,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: const InputDecoration(
+                            labelText: 'Lote Pollo en Canal',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.tag),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _DateField(
+                          label: 'Vence Pollo',
+                          date: _vencimientoPollo,
+                          onPicked: (d) =>
+                              setState(() => _vencimientoPollo = d),
+                          nullable: true,
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
+
+                    // Menudencias
+                    Row(children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _loteMenudCtrl,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: const InputDecoration(
+                            labelText: 'Lote Menudencias',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.tag),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _DateField(
+                          label: 'Vence Menudencias',
+                          date: _vencimientoMenudencias,
+                          onPicked: (d) =>
+                              setState(() => _vencimientoMenudencias = d),
+                          nullable: true,
                         ),
                       ),
                     ]),
@@ -1287,10 +1363,16 @@ class _InfoRow extends StatelessWidget {
 
 class _DateField extends StatelessWidget {
   final String label;
-  final DateTime date;
+  final DateTime? date;
   final void Function(DateTime) onPicked;
-  const _DateField(
-      {required this.label, required this.date, required this.onPicked});
+  /// Si true, la fecha es opcional y puede ser null (muestra placeholder).
+  final bool nullable;
+  const _DateField({
+    required this.label,
+    required this.date,
+    required this.onPicked,
+    this.nullable = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1298,9 +1380,9 @@ class _DateField extends StatelessWidget {
       onTap: () async {
         final d = await showDatePicker(
           context: context,
-          initialDate: date,
+          initialDate: date ?? DateTime.now(),
           firstDate: DateTime(2020),
-          lastDate: DateTime(2030),
+          lastDate: DateTime(2035),
         );
         if (d != null) onPicked(d);
       },
@@ -1310,7 +1392,9 @@ class _DateField extends StatelessWidget {
           border: const OutlineInputBorder(),
           prefixIcon: const Icon(Icons.calendar_today),
         ),
-        child: Text(formatDate(date)),
+        child: Text(
+          date != null ? formatDate(date!) : (nullable ? '—' : ''),
+        ),
       ),
     );
   }
