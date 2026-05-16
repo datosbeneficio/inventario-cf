@@ -223,11 +223,14 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       // Pre-generar ID para poder subir la foto antes del batch
       final despachoId = FirestoreService.instance.newDespachoId();
 
-      // Subir foto del precinto (si existe)
+      // Subir foto del precinto (si existe).
+      // Si falla o supera el tiempo límite se continúa sin foto.
       String? fotoUrl;
+      bool fotoFallo = false;
       if (_fotoBytes != null) {
         fotoUrl = await FirestoreService.instance.uploadPrecintoFoto(
           despachoId, _fotoBytes!, _fotoExt);
+        if (fotoUrl == null) fotoFallo = true;
       }
 
       final despacho = Despacho(
@@ -267,6 +270,17 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
           _despachado = true;
           _ultimoDespacho = despacho;
         });
+        if (fotoFallo) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Despacho guardado. La foto del precinto no pudo subirse '
+                  '(verifica conexión o permisos de Storage).'),
+              duration: Duration(seconds: 6),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

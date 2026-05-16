@@ -281,15 +281,24 @@ class FirestoreService {
   String newDespachoId() => _db.collection('despachos').doc().id;
 
   /// Sube la foto del precinto a Firebase Storage y retorna la URL pública.
-  Future<String> uploadPrecintoFoto(
+  /// Retorna null si la subida falla o supera el tiempo límite (30 s).
+  Future<String?> uploadPrecintoFoto(
       String despachoId, Uint8List bytes, String ext) async {
-    final ref = FirebaseStorage.instance
-        .ref('despachos/$despachoId/precinto.$ext');
-    await ref.putData(
-      bytes,
-      SettableMetadata(contentType: 'image/$ext'),
-    );
-    return await ref.getDownloadURL();
+    try {
+      final ref = FirebaseStorage.instance
+          .ref('despachos/$despachoId/precinto.$ext');
+      await ref
+          .putData(
+            bytes,
+            SettableMetadata(contentType: 'image/$ext'),
+          )
+          .timeout(const Duration(seconds: 30));
+      return await ref.getDownloadURL()
+          .timeout(const Duration(seconds: 10));
+    } catch (e) {
+      debugPrint('uploadPrecintoFoto: fallo ($e)');
+      return null;
+    }
   }
 
   /// Crea el documento de despacho y todas las salidas en un único batch.
