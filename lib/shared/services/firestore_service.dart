@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/ciclo_config.dart';
 import '../models/cliente.dart';
@@ -15,6 +16,10 @@ class FirestoreService {
   FirestoreService._();
 
   final _db = FirebaseFirestore.instance;
+
+  /// Email del usuario autenticado actualmente, para trazabilidad.
+  String get _creadoPor =>
+      FirebaseAuth.instance.currentUser?.email ?? '';
 
   // ── Clientes ────────────────────────────────────────────────────────────
 
@@ -109,6 +114,7 @@ class FirestoreService {
         'esCola': esCola,
         'unidades': unidades,
         'timestamp': FieldValue.serverTimestamp(),
+        if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
       });
 
   Future<void> updateIngreso(
@@ -158,6 +164,7 @@ class FirestoreService {
         'esCola': esCola,
         'unidades': unidades,
         'timestamp': FieldValue.serverTimestamp(),
+        if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
       });
 
   Future<void> updateSalida(
@@ -283,14 +290,20 @@ class FirestoreService {
   /// Retorna el ID del documento creado.
   Future<String> addDespacho(Despacho despacho,
       {String? predefinedId}) async {
+    final quien = _creadoPor;
     final batch = _db.batch();
     final despachoRef = predefinedId != null
         ? _db.collection('despachos').doc(predefinedId)
         : _db.collection('despachos').doc();
-    batch.set(despachoRef, despacho.toMap());
+    // Inyectar creadoPor en el despacho
+    final despachoMap = {
+      ...despacho.toMap(),
+      if (quien.isNotEmpty) 'creadoPor': quien,
+    };
+    batch.set(despachoRef, despachoMap);
     for (final linea in despacho.lineas) {
       final salidaRef = _db.collection('salidas').doc();
-      batch.set(salidaRef, linea.toSalidaMap(despachoRef.id));
+      batch.set(salidaRef, linea.toSalidaMap(despachoRef.id, quien));
     }
     await batch.commit();
     return despachoRef.id;

@@ -13,6 +13,8 @@ class Salida {
   final int unidades;
   final DateTime timestamp;
   final String? despachoId;
+  /// Email del usuario que registró el movimiento.
+  final String creadoPor;
 
   const Salida({
     required this.id,
@@ -27,6 +29,7 @@ class Salida {
     required this.unidades,
     required this.timestamp,
     this.despachoId,
+    this.creadoPor = '',
   });
 
   factory Salida.fromDoc(DocumentSnapshot doc) {
@@ -46,6 +49,7 @@ class Salida {
           ? (d['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
       despachoId: d['despachoId'] as String?,
+      creadoPor: d['creadoPor'] ?? '',
     );
   }
 
@@ -60,5 +64,6 @@ class Salida {
         'esCola': esCola,
         'unidades': unidades,
         'timestamp': FieldValue.serverTimestamp(),
+        if (creadoPor.isNotEmpty) 'creadoPor': creadoPor,
       };
 }

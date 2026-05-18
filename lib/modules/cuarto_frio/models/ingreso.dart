@@ -12,6 +12,8 @@ class Ingreso {
   final bool esCola;
   final int unidades;
   final DateTime timestamp;
+  /// Email del usuario que registró el movimiento.
+  final String creadoPor;
 
   const Ingreso({
     required this.id,
@@ -25,6 +27,7 @@ class Ingreso {
     required this.esCola,
     required this.unidades,
     required this.timestamp,
+    this.creadoPor = '',
   });
 
   factory Ingreso.fromDoc(DocumentSnapshot doc) {
@@ -43,6 +46,7 @@ class Ingreso {
       timestamp: d['timestamp'] != null
           ? (d['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
+      creadoPor: d['creadoPor'] ?? '',
     );
   }
 
@@ -57,5 +61,6 @@ class Ingreso {
         'esCola': esCola,
         'unidades': unidades,
         'timestamp': FieldValue.serverTimestamp(),
+        if (creadoPor.isNotEmpty) 'creadoPor': creadoPor,
       };
 }

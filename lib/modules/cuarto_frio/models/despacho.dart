@@ -49,11 +49,12 @@ class DespachoLinea {
         'esCola': esCola,
       };
 
-  /// Serializa esta línea como documento de `salidas` (con despachoId inyectado).
-  Map<String, dynamic> toSalidaMap(String despachoId) => {
+  /// Serializa esta línea como documento de `salidas` (con despachoId y creadoPor inyectados).
+  Map<String, dynamic> toSalidaMap(String despachoId, String creadoPor) => {
         ...toMap(),
         'despachoId': despachoId,
         'timestamp': FieldValue.serverTimestamp(),
+        if (creadoPor.isNotEmpty) 'creadoPor': creadoPor,
       };
 }
 
@@ -88,6 +89,8 @@ class Despacho {
   final DateTime timestamp;
   final String? precintoFotoUrl;
   final String observaciones;
+  /// Email del usuario que creó el despacho.
+  final String creadoPor;
 
   const Despacho({
     required this.id,
@@ -120,6 +123,7 @@ class Despacho {
     required this.timestamp,
     this.precintoFotoUrl,
     this.observaciones = '',
+    this.creadoPor = '',
   });
 
   factory Despacho.fromDoc(DocumentSnapshot doc) {
@@ -166,6 +170,7 @@ class Despacho {
           : DateTime.now(),
       precintoFotoUrl: d['precintoFotoUrl'] as String?,
       observaciones: d['observaciones'] ?? '',
+      creadoPor: d['creadoPor'] ?? '',
     );
   }
 
@@ -199,6 +204,7 @@ class Despacho {
         'timestamp': FieldValue.serverTimestamp(),
         if (precintoFotoUrl != null) 'precintoFotoUrl': precintoFotoUrl,
         if (observaciones.isNotEmpty) 'observaciones': observaciones,
+        if (creadoPor.isNotEmpty) 'creadoPor': creadoPor,
       };
 
   // Totales calculados
