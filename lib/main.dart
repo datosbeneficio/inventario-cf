@@ -2,16 +2,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'models/ciclo_config.dart';
-import 'models/cliente.dart';
-import 'models/ingreso.dart';
-import 'models/salida.dart';
-import 'models/vehiculo.dart';
-import 'models/destino.dart';
-import 'models/despacho.dart';
-import 'models/empresa_config.dart';
-import 'providers/auth_provider.dart';
-import 'services/firestore_service.dart';
+import 'shared/models/ciclo_config.dart';
+import 'shared/models/cliente.dart';
+import 'modules/cuarto_frio/models/ingreso.dart';
+import 'modules/cuarto_frio/models/salida.dart';
+import 'modules/cuarto_frio/models/vehiculo.dart';
+import 'modules/cuarto_frio/models/destino.dart';
+import 'modules/cuarto_frio/models/despacho.dart';
+import 'shared/models/empresa_config.dart';
+import 'shared/providers/auth_provider.dart';
+import 'shared/services/firestore_service.dart';
 import 'app.dart';
 
 void main() async {

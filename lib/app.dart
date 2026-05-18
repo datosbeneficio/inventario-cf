@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'providers/auth_provider.dart';
-import 'utils/constants.dart';
-import 'screens/login_screen.dart';
-import 'screens/coordinador/coordinador_home.dart';
-import 'screens/encargado/encargado_home.dart';
-import 'screens/supervisor/supervisor_home.dart';
-import 'screens/supervisor_menudencias/supervisor_menudencias_home.dart';
+import 'shared/providers/auth_provider.dart';
+import 'shared/utils/constants.dart';
+import 'shared/screens/login_screen.dart';
+import 'modules/cuarto_frio/screens/coordinador/coordinador_home.dart';
+import 'modules/cuarto_frio/screens/encargado/encargado_home.dart';
+import 'modules/cuarto_frio/screens/supervisor/supervisor_home.dart';
+import 'modules/cuarto_frio/screens/supervisor_menudencias/supervisor_menudencias_home.dart';
 
 class InventarioCfApp extends StatelessWidget {
   const InventarioCfApp({super.key});
