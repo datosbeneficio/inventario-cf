@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../../models/ciclo_config.dart';
 import '../../models/cliente.dart';
 import '../../models/despacho.dart';
 import '../../models/destino.dart';
+import '../../models/empresa_config.dart';
 import '../../models/ingreso.dart';
 import '../../models/rango.dart';
 import '../../models/salida.dart';
 import '../../models/vehiculo.dart';
 import '../../services/firestore_service.dart';
 import '../../utils/constants.dart';
+import '../../utils/despacho_pdf.dart';
 import '../../utils/formatters.dart';
 import 'despacho_detalle_screen.dart';
 
@@ -51,7 +54,6 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 
   // ── Foto del precinto ────────────────────────────────────────────────────
   Uint8List? _fotoBytes;
-  String _fotoExt = 'jpg';
 
   // ── Líneas de producto ───────────────────────────────────────────────────
   final List<DespachoLinea> _lineas = [];
@@ -128,7 +130,6 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       _vencimientoMenudencias = null;
       _mostrarErrorVenc = false;
       _fotoBytes = null;
-      _fotoExt = 'jpg';
       _lineas.clear();
       _submitting = false;
       _despachado = false;
@@ -151,10 +152,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       );
       if (xfile == null) return;
       final bytes = await xfile.readAsBytes();
-      final ext = xfile.name.split('.').last.toLowerCase();
       setState(() {
         _fotoBytes = bytes;
-        _fotoExt = ['jpg', 'jpeg', 'png', 'webp'].contains(ext) ? ext : 'jpg';
       });
     } catch (e) {
       if (mounted) {
@@ -243,18 +242,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 
     setState(() => _submitting = true);
     try {
-      // Pre-generar ID para poder subir la foto antes del batch
       final despachoId = FirestoreService.instance.newDespachoId();
-
-      // Subir foto del precinto (si existe).
-      // Si falla o supera el tiempo límite se continúa sin foto.
-      String? fotoUrl;
-      bool fotoFallo = false;
-      if (_fotoBytes != null) {
-        fotoUrl = await FirestoreService.instance.uploadPrecintoFoto(
-          despachoId, _fotoBytes!, _fotoExt);
-        if (fotoUrl == null) fotoFallo = true;
-      }
 
       final despacho = Despacho(
         id: despachoId,
@@ -285,7 +273,6 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         observaciones: _obsCtrl.text.trim(),
         lineas: _lineas,
         timestamp: DateTime.now(),
-        precintoFotoUrl: fotoUrl,
       );
 
       await FirestoreService.instance.addDespacho(
@@ -297,17 +284,6 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
           _despachado = true;
           _ultimoDespacho = despacho;
         });
-        if (fotoFallo) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Despacho guardado. La foto del precinto no pudo subirse '
-                  '(verifica conexión o permisos de Storage).'),
-              duration: Duration(seconds: 6),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -339,6 +315,9 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
           if (_despachado && _ultimoDespacho != null) ...[
             _SuccessBanner(
               guiaNro: _ultimoDespacho!.guiaNro,
+              despacho: _ultimoDespacho!,
+              fotoBytes: _fotoBytes,
+              empresa: context.read<EmpresaConfig>(),
               onVerGuia: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -884,14 +863,29 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 
 class _SuccessBanner extends StatelessWidget {
   final String guiaNro;
+  final Despacho despacho;
+  final Uint8List? fotoBytes;
+  final EmpresaConfig empresa;
   final VoidCallback onVerGuia;
   final VoidCallback onNuevoDespacho;
 
   const _SuccessBanner({
     required this.guiaNro,
+    required this.despacho,
+    required this.fotoBytes,
+    required this.empresa,
     required this.onVerGuia,
     required this.onNuevoDespacho,
   });
+
+  Future<void> _imprimirPdf(BuildContext context) async {
+    await Printing.layoutPdf(
+      onLayout: (fmt) async =>
+          (await buildDespachoPdf(despacho, empresa,
+                  fotoBytes: fotoBytes))
+              .save(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -923,15 +917,32 @@ class _SuccessBanner extends StatelessWidget {
                             color: Colors.green),
                       ),
                       Text(
-                        'Guía N° $guiaNro enviada correctamente.',
+                        'Guía N° $guiaNro guardada correctamente.',
                         style: const TextStyle(fontSize: 13),
                       ),
+                      if (fotoBytes != null)
+                        const Text(
+                          'Imprime el PDF ahora para incluir la foto del precinto.',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.orange),
+                        ),
                     ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+            // Fila superior: imprimir PDF (destacado)
+            FilledButton.icon(
+              onPressed: () => _imprimirPdf(context),
+              icon: const Icon(Icons.print, size: 18),
+              label: const Text('Imprimir / Guardar PDF'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.green.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Fila inferior: ver guía en pantalla | nuevo despacho
             Row(
               children: [
                 Expanded(
@@ -947,12 +958,13 @@ class _SuccessBanner extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: FilledButton.icon(
+                  child: OutlinedButton.icon(
                     onPressed: onNuevoDespacho,
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Nuevo despacho'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.green.shade700,
+                      side: BorderSide(color: Colors.green.shade400),
                     ),
                   ),
                 ),

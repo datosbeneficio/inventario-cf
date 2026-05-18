@@ -1,22 +1,17 @@
+import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import '../models/despacho.dart';
 import '../models/empresa_config.dart';
 import 'formatters.dart';
 
 /// Construye el documento PDF de la guía de despacho.
+/// [fotoBytes] son los bytes de la foto del precinto en memoria;
+/// si se omiten el PDF se genera sin esa sección.
 Future<pw.Document> buildDespachoPdf(
-    Despacho d, EmpresaConfig empresa) async {
-  // Cargar imagen del precinto si existe
-  pw.ImageProvider? precintoImg;
-  if (d.precintoFotoUrl != null && d.precintoFotoUrl!.isNotEmpty) {
-    try {
-      precintoImg = await networkImage(d.precintoFotoUrl!);
-    } catch (_) {
-      // Si falla la descarga, continúa sin imagen
-    }
-  }
+    Despacho d, EmpresaConfig empresa, {Uint8List? fotoBytes}) async {
+  final pw.ImageProvider? precintoImg =
+      fotoBytes != null ? pw.MemoryImage(fotoBytes) : null;
 
   final doc = pw.Document();
 

@@ -1,6 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/ciclo_config.dart';
 import '../models/cliente.dart';
@@ -279,27 +277,6 @@ class FirestoreService {
 
   /// Genera un nuevo ID para un despacho sin crearlo aún.
   String newDespachoId() => _db.collection('despachos').doc().id;
-
-  /// Sube la foto del precinto a Firebase Storage y retorna la URL pública.
-  /// Retorna null si la subida falla o supera el tiempo límite (30 s).
-  Future<String?> uploadPrecintoFoto(
-      String despachoId, Uint8List bytes, String ext) async {
-    try {
-      final ref = FirebaseStorage.instance
-          .ref('despachos/$despachoId/precinto.$ext');
-      await ref
-          .putData(
-            bytes,
-            SettableMetadata(contentType: 'image/$ext'),
-          )
-          .timeout(const Duration(seconds: 30));
-      return await ref.getDownloadURL()
-          .timeout(const Duration(seconds: 10));
-    } catch (e) {
-      debugPrint('uploadPrecintoFoto: fallo ($e)');
-      return null;
-    }
-  }
 
   /// Crea el documento de despacho y todas las salidas en un único batch.
   /// Si se pasa [predefinedId], usa ese ID en lugar de generar uno nuevo.
