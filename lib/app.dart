@@ -29,6 +29,12 @@ class InventarioCfApp extends StatelessWidget {
       ),
       home: Consumer<AuthProvider>(
         builder: (ctx, auth, _) {
+          // Muestra spinner mientras Firebase Auth resuelve el estado inicial
+          if (auth.isLoading) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
           if (!auth.isLoggedIn) return const LoginScreen();
           return switch (auth.role) {
             kRolCoordinador => const CoordinadorHome(),
