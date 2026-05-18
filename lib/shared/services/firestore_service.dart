@@ -17,6 +17,15 @@ class FirestoreService {
 
   final _db = FirebaseFirestore.instance;
 
+  // ── Nombres de colecciones (prefijo cf_ = módulo Cuarto Frío) ────────────
+  // Las colecciones sin prefijo son compartidas entre módulos.
+  static const _colIngresos  = 'cf_ingresos';
+  static const _colSalidas   = 'cf_salidas';
+  static const _colDespachos = 'cf_despachos';
+  static const _colVehiculos = 'cf_vehiculos';
+  static const _colDestinos  = 'cf_destinos';
+  static const _colClientes  = 'clientes';   // compartido
+
   /// Email del usuario autenticado actualmente, para trazabilidad.
   String get _creadoPor =>
       FirebaseAuth.instance.currentUser?.email ?? '';
@@ -24,7 +33,7 @@ class FirestoreService {
   // ── Clientes ────────────────────────────────────────────────────────────
 
   Stream<List<Cliente>> clientesStream() => _db
-      .collection('clientes')
+      .collection(_colClientes)
       .orderBy('nombre')
       .snapshots()
       .map((s) => s.docs
@@ -32,19 +41,19 @@ class FirestoreService {
           .where((c) => c.activo)
           .toList());
 
-  Future<void> addCliente(String nombre) => _db.collection('clientes').add({
+  Future<void> addCliente(String nombre) => _db.collection(_colClientes).add({
         'nombre': nombre.trim(),
         'activo': true,
         'creadoEn': FieldValue.serverTimestamp(),
       });
 
   Future<void> deleteCliente(String id) =>
-      _db.collection('clientes').doc(id).update({'activo': false});
+      _db.collection(_colClientes).doc(id).update({'activo': false});
 
   // ── Rangos (subcollección de cliente) ───────────────────────────────────
 
   Stream<List<Rango>> rangosStream(String clienteId) => _db
-      .collection('clientes')
+      .collection(_colClientes)
       .doc(clienteId)
       .collection('rangos')
       .orderBy('nombre')
@@ -63,7 +72,7 @@ class FirestoreService {
     String? descripcion,
   }) =>
       _db
-          .collection('clientes')
+          .collection(_colClientes)
           .doc(clienteId)
           .collection('rangos')
           .add({
@@ -78,7 +87,7 @@ class FirestoreService {
       });
 
   Future<void> deleteRango(String clienteId, String rangoId) => _db
-      .collection('clientes')
+      .collection(_colClientes)
       .doc(clienteId)
       .collection('rangos')
       .doc(rangoId)
@@ -87,7 +96,7 @@ class FirestoreService {
   // ── Ingresos ─────────────────────────────────────────────────────────────
 
   Stream<List<Ingreso>> ingresosStream() => _db
-      .collection('ingresos')
+      .collection(_colIngresos)
       .orderBy('timestamp', descending: true)
       .snapshots()
       .map((s) => s.docs.map(Ingreso.fromDoc).toList());
@@ -103,7 +112,7 @@ class FirestoreService {
     required bool esCola,
     required int unidades,
   }) =>
-      _db.collection('ingresos').add({
+      _db.collection(_colIngresos).add({
         'clienteId': clienteId,
         'clienteNombre': clienteNombre,
         'rangoId': rangoId,
@@ -124,7 +133,7 @@ class FirestoreService {
     required bool esCola,
     required int unidades,
   }) =>
-      _db.collection('ingresos').doc(id).update({
+      _db.collection(_colIngresos).doc(id).update({
         'canastillas': canastillas,
         'peso': peso,
         'esCola': esCola,
@@ -132,12 +141,12 @@ class FirestoreService {
       });
 
   Future<void> deleteIngreso(String id) =>
-      _db.collection('ingresos').doc(id).delete();
+      _db.collection(_colIngresos).doc(id).delete();
 
   // ── Salidas ──────────────────────────────────────────────────────────────
 
   Stream<List<Salida>> salidasStream() => _db
-      .collection('salidas')
+      .collection(_colSalidas)
       .orderBy('timestamp', descending: true)
       .snapshots()
       .map((s) => s.docs.map(Salida.fromDoc).toList());
@@ -153,7 +162,7 @@ class FirestoreService {
     required bool esCola,
     required int unidades,
   }) =>
-      _db.collection('salidas').add({
+      _db.collection(_colSalidas).add({
         'clienteId': clienteId,
         'clienteNombre': clienteNombre,
         'rangoId': rangoId,
@@ -174,7 +183,7 @@ class FirestoreService {
     required bool esCola,
     required int unidades,
   }) =>
-      _db.collection('salidas').doc(id).update({
+      _db.collection(_colSalidas).doc(id).update({
         'canastillas': canastillas,
         'peso': peso,
         'esCola': esCola,
@@ -182,12 +191,12 @@ class FirestoreService {
       });
 
   Future<void> deleteSalida(String id) =>
-      _db.collection('salidas').doc(id).delete();
+      _db.collection(_colSalidas).doc(id).delete();
 
   // ── Vehículos ────────────────────────────────────────────────────────────
 
   Stream<List<Vehiculo>> vehiculosStream() => _db
-      .collection('vehiculos')
+      .collection(_colVehiculos)
       .orderBy('placa')
       .snapshots()
       .map((s) => s.docs
@@ -202,7 +211,7 @@ class FirestoreService {
     required String conductorCelular,
     required double capacidadKg,
   }) =>
-      _db.collection('vehiculos').add({
+      _db.collection(_colVehiculos).add({
         'placa': placa.toUpperCase().trim(),
         'conductorNombre': conductorNombre.trim(),
         'conductorCedula': conductorCedula.trim(),
@@ -220,7 +229,7 @@ class FirestoreService {
     required String conductorCelular,
     required double capacidadKg,
   }) =>
-      _db.collection('vehiculos').doc(id).update({
+      _db.collection(_colVehiculos).doc(id).update({
         'placa': placa.toUpperCase().trim(),
         'conductorNombre': conductorNombre.trim(),
         'conductorCedula': conductorCedula.trim(),
@@ -229,12 +238,12 @@ class FirestoreService {
       });
 
   Future<void> deleteVehiculo(String id) =>
-      _db.collection('vehiculos').doc(id).update({'activo': false});
+      _db.collection(_colVehiculos).doc(id).update({'activo': false});
 
   // ── Destinos ─────────────────────────────────────────────────────────────
 
   Stream<List<Destino>> destinosStream() => _db
-      .collection('destinos')
+      .collection(_colDestinos)
       .orderBy('nombre')
       .snapshots()
       .map((s) => s.docs
@@ -248,7 +257,7 @@ class FirestoreService {
     required String municipio,
     required String departamento,
   }) =>
-      _db.collection('destinos').add({
+      _db.collection(_colDestinos).add({
         'nombre': nombre.trim(),
         'direccion': direccion.trim(),
         'municipio': municipio.trim(),
@@ -264,7 +273,7 @@ class FirestoreService {
     required String municipio,
     required String departamento,
   }) =>
-      _db.collection('destinos').doc(id).update({
+      _db.collection(_colDestinos).doc(id).update({
         'nombre': nombre.trim(),
         'direccion': direccion.trim(),
         'municipio': municipio.trim(),
@@ -272,18 +281,18 @@ class FirestoreService {
       });
 
   Future<void> deleteDestino(String id) =>
-      _db.collection('destinos').doc(id).update({'activo': false});
+      _db.collection(_colDestinos).doc(id).update({'activo': false});
 
   // ── Despachos ────────────────────────────────────────────────────────────
 
   Stream<List<Despacho>> despachosStream() => _db
-      .collection('despachos')
+      .collection(_colDespachos)
       .orderBy('timestamp', descending: true)
       .snapshots()
       .map((s) => s.docs.map(Despacho.fromDoc).toList());
 
   /// Genera un nuevo ID para un despacho sin crearlo aún.
-  String newDespachoId() => _db.collection('despachos').doc().id;
+  String newDespachoId() => _db.collection(_colDespachos).doc().id;
 
   /// Crea el documento de despacho y todas las salidas en un único batch.
   /// Si se pasa [predefinedId], usa ese ID en lugar de generar uno nuevo.
@@ -293,8 +302,8 @@ class FirestoreService {
     final quien = _creadoPor;
     final batch = _db.batch();
     final despachoRef = predefinedId != null
-        ? _db.collection('despachos').doc(predefinedId)
-        : _db.collection('despachos').doc();
+        ? _db.collection(_colDespachos).doc(predefinedId)
+        : _db.collection(_colDespachos).doc();
     // Inyectar creadoPor en el despacho
     final despachoMap = {
       ...despacho.toMap(),
@@ -302,7 +311,7 @@ class FirestoreService {
     };
     batch.set(despachoRef, despachoMap);
     for (final linea in despacho.lineas) {
-      final salidaRef = _db.collection('salidas').doc();
+      final salidaRef = _db.collection(_colSalidas).doc();
       batch.set(salidaRef, linea.toSalidaMap(despachoRef.id, quien));
     }
     await batch.commit();
@@ -312,9 +321,9 @@ class FirestoreService {
   Future<void> deleteDespacho(String despachoId) async {
     // Eliminar el documento de despacho y las salidas asociadas
     final batch = _db.batch();
-    batch.delete(_db.collection('despachos').doc(despachoId));
+    batch.delete(_db.collection(_colDespachos).doc(despachoId));
     final salidas = await _db
-        .collection('salidas')
+        .collection(_colSalidas)
         .where('despachoId', isEqualTo: despachoId)
         .get();
     for (final doc in salidas.docs) {
