@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/despacho.dart';
@@ -13,6 +13,10 @@ Future<pw.Document> buildDespachoPdf(
   final pw.ImageProvider? precintoImg =
       fotoBytes != null ? pw.MemoryImage(fotoBytes) : null;
 
+  // Cargar logo desde assets
+  final logoData = await rootBundle.load('assets/images/logo.png');
+  final logoImg = pw.MemoryImage(logoData.buffer.asUint8List());
+
   final doc = pw.Document();
 
   doc.addPage(
@@ -22,7 +26,7 @@ Future<pw.Document> buildDespachoPdf(
       build: (ctx) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          _header(empresa),
+          _header(empresa, logoImg),
           pw.SizedBox(height: 8),
           _idRow(d),
           pw.SizedBox(height: 6),
@@ -49,10 +53,14 @@ Future<pw.Document> buildDespachoPdf(
 
 // ── Encabezado empresa ──────────────────────────────────────────────────────
 
-pw.Widget _header(EmpresaConfig e) {
+pw.Widget _header(EmpresaConfig e, pw.ImageProvider logo) {
   final bold = pw.TextStyle(fontWeight: pw.FontWeight.bold);
   return pw.Column(
     children: [
+      pw.Center(
+        child: pw.Image(logo, height: 48, fit: pw.BoxFit.contain),
+      ),
+      pw.SizedBox(height: 4),
       if (e.nombre.isNotEmpty)
         pw.Text(e.nombre.toUpperCase(),
             style: bold.copyWith(fontSize: 13),

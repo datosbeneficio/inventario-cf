@@ -7,6 +7,7 @@ import '../../services/firestore_service.dart';
 import '../../widgets/entrada_form.dart';
 import '../../widgets/inventario_panel.dart';
 import '../../widgets/movimiento_tile.dart';
+import '../../widgets/app_logo.dart';
 import '../../widgets/confirm_delete_dialog.dart';
 import '../../utils/formatters.dart';
 import '../../utils/constants.dart';
@@ -29,6 +30,7 @@ class _EncargadoHomeState extends State<EncargadoHome> {
       appBar: AppBar(
         title: Text(_titles[_tab]),
         actions: [
+          const AppLogo(),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión',

@@ -4,6 +4,7 @@ import '../../models/ciclo_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/firestore_service.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/app_logo.dart';
 import '../../widgets/consolidado_panel.dart';
 import 'clientes_screen.dart';
 import 'empresa_config_screen.dart';
@@ -47,6 +48,7 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
       appBar: AppBar(
         title: Text(_tabs[_tab].title),
         actions: [
+          const AppLogo(),
           // ── Reiniciar inventario ────────────────────────────────────────
           IconButton(
             icon: const Icon(Icons.restart_alt),

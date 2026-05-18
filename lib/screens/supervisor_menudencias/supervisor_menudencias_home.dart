@@ -7,6 +7,7 @@ import '../../services/firestore_service.dart';
 import '../../widgets/menudencias_form.dart';
 import '../../widgets/movimiento_tile.dart';
 import '../../widgets/inventario_panel.dart';
+import '../../widgets/app_logo.dart';
 import '../../widgets/confirm_delete_dialog.dart';
 import '../../utils/constants.dart';
 import '../../utils/formatters.dart';
@@ -31,6 +32,7 @@ class _SupervisorMenudenciasHomeState
       appBar: AppBar(
         title: Text(_titles[_tab]),
         actions: [
+          const AppLogo(),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión',

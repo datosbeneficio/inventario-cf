@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/despacho.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/app_logo.dart';
 import '../../widgets/inventario_panel.dart';
 import 'despacho_detalle_screen.dart';
 import 'destinos_screen.dart';
@@ -32,6 +33,7 @@ class _SupervisorHomeState extends State<SupervisorHome> {
       appBar: AppBar(
         title: Text(_titles[_tab]),
         actions: [
+          const AppLogo(),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión',

@@ -64,8 +64,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.ac_unit, size: 64, color: cs.primary),
-                    const SizedBox(height: 8),
+                    Image.asset(
+                      'assets/images/logo.png',
+                      height: 90,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(height: 16),
                     Text(
                       'Cuarto Frío',
                       style: Theme.of(context)
