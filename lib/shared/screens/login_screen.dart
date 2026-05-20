@@ -11,14 +11,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _nicknameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _nicknameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -28,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     final error = await context.read<AuthProvider>().login(
-          _emailController.text,
+          _nicknameController.text,
           _passwordController.text,
         );
 
@@ -88,19 +88,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // ── Email ──────────────────────────────────────────
+                      // ── Usuario ────────────────────────────────────────
                       TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
+                        controller: _nicknameController,
+                        keyboardType: TextInputType.text,
                         textInputAction: TextInputAction.next,
+                        autocorrect: false,
                         decoration: const InputDecoration(
-                          labelText: 'Correo electrónico',
+                          labelText: 'Usuario',
+                          hintText: 'ej: supervisor',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.email_outlined),
+                          prefixIcon: Icon(Icons.person_outline),
                         ),
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) {
-                            return 'Ingresa tu correo';
+                            return 'Ingresa tu usuario';
                           }
                           return null;
                         },

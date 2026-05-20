@@ -26,9 +26,13 @@ class FirestoreService {
   static const _colDestinos  = 'cf_destinos';
   static const _colClientes  = 'clientes';   // compartido
 
-  /// Email del usuario autenticado actualmente, para trazabilidad.
-  String get _creadoPor =>
-      FirebaseAuth.instance.currentUser?.email ?? '';
+  /// Nickname del usuario autenticado (parte antes del @ del email interno).
+  /// Ejemplo: 'supervisor@avima.cf' → 'supervisor'
+  String get _creadoPor {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    final idx = email.indexOf('@');
+    return idx > 0 ? email.substring(0, idx) : email;
+  }
 
   // ── Clientes ────────────────────────────────────────────────────────────
 
