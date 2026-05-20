@@ -87,9 +87,9 @@ class _IngresoAvesBody extends StatelessWidget {
           ]);
         }
         return Column(children: [
-          Padding(padding: const EdgeInsets.all(16), child: form),
+          Expanded(flex: 3, child: form),
           const Divider(),
-          Expanded(child: list),
+          Expanded(flex: 2, child: list),
         ]);
       },
     );
