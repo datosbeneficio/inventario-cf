@@ -212,14 +212,14 @@ class FirestoreService {
     required String placa,
     required String conductorNombre,
     required String conductorCedula,
-    required String conductorCelular,
+    required String plancha,
     required double capacidadKg,
   }) =>
       _db.collection(_colVehiculos).add({
         'placa': placa.toUpperCase().trim(),
         'conductorNombre': conductorNombre.trim(),
         'conductorCedula': conductorCedula.trim(),
-        'conductorCelular': conductorCelular.trim(),
+        'plancha': plancha.trim(),
         'capacidadKg': capacidadKg,
         'activo': true,
         'creadoEn': FieldValue.serverTimestamp(),
@@ -230,14 +230,14 @@ class FirestoreService {
     required String placa,
     required String conductorNombre,
     required String conductorCedula,
-    required String conductorCelular,
+    required String plancha,
     required double capacidadKg,
   }) =>
       _db.collection(_colVehiculos).doc(id).update({
         'placa': placa.toUpperCase().trim(),
         'conductorNombre': conductorNombre.trim(),
         'conductorCedula': conductorCedula.trim(),
-        'conductorCelular': conductorCelular.trim(),
+        'plancha': plancha.trim(),
         'capacidadKg': capacidadKg,
       });
 

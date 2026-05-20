@@ -144,7 +144,7 @@ pw.Widget _infoGrid(Despacho d) {
     ['CAPACIDAD:', '${formatNum(d.capacidadKg)} KG', 'TEMP. MENUDENCIAS:', d.tempMenudencias],
     ['HORA SALIDA:', d.horaSalida, 'TEMP. PRE-ENFRIAM.:', d.tempPreEnfriamiento],
     ['CONDUCTOR:', d.conductorNombre, 'Nº PRECINTO:', d.precinto],
-    ['CC / CEL:', '${d.conductorCedula} / ${d.conductorCelular}', '', ''],
+    ['CC / PLANCHA:', '${d.conductorCedula} / ${d.plancha}', '', ''],
     ['LOTE POLLO EN CANAL:', d.lotePollo, 'VENCE POLLO:', vencPollo],
     ['LOTE MENUDENCIAS:', d.loteMenudencias, 'VENCE MENUDENCIAS:', vencMenud],
   ];

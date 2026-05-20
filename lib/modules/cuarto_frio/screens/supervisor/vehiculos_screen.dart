@@ -37,8 +37,8 @@ class VehiculosScreen extends StatelessWidget {
         TextEditingController(text: existing?.conductorNombre ?? '');
     final cedulaCtrl =
         TextEditingController(text: existing?.conductorCedula ?? '');
-    final celularCtrl =
-        TextEditingController(text: existing?.conductorCelular ?? '');
+    final planchaCtrl =
+        TextEditingController(text: existing?.plancha ?? '');
     final capacidadCtrl = TextEditingController(
         text: existing?.capacidadKg != null
             ? formatNum(existing!.capacidadKg)
@@ -93,13 +93,13 @@ class VehiculosScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
-                  controller: celularCtrl,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  controller: planchaCtrl,
+                  textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(
-                    labelText: 'Celular del conductor',
+                    labelText: 'Plancha del camión',
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.phone),
+                    prefixIcon: Icon(Icons.grid_view),
+                    hintText: 'Ej: P1-P2-P3',
                   ),
                   validator: (v) =>
                       (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
@@ -145,7 +145,7 @@ class VehiculosScreen extends StatelessWidget {
                   placa: placaCtrl.text,
                   conductorNombre: nombreCtrl.text,
                   conductorCedula: cedulaCtrl.text,
-                  conductorCelular: celularCtrl.text,
+                  plancha: planchaCtrl.text,
                   capacidadKg: cap,
                 );
               } else {
@@ -154,7 +154,7 @@ class VehiculosScreen extends StatelessWidget {
                   placa: placaCtrl.text,
                   conductorNombre: nombreCtrl.text,
                   conductorCedula: cedulaCtrl.text,
-                  conductorCelular: celularCtrl.text,
+                  plancha: planchaCtrl.text,
                   capacidadKg: cap,
                 );
               }
@@ -190,7 +190,7 @@ class _VehiculoTile extends StatelessWidget {
           children: [
             Text(v.conductorNombre),
             Text(
-              'CC ${v.conductorCedula} · ${v.conductorCelular} · '
+              'CC ${v.conductorCedula} · Plancha: ${v.plancha} · '
               '${formatNum(v.capacidadKg)} kg',
               style:
                   TextStyle(fontSize: 11, color: cs.onSurfaceVariant),

@@ -68,7 +68,7 @@ class Despacho {
   final String placa;
   final String conductorNombre;
   final String conductorCedula;
-  final String conductorCelular;
+  final String plancha;
   final double capacidadKg;
   final String horaSalida;
   final String destinoId;
@@ -101,7 +101,7 @@ class Despacho {
     required this.placa,
     required this.conductorNombre,
     required this.conductorCedula,
-    required this.conductorCelular,
+    required this.plancha,
     required this.capacidadKg,
     required this.horaSalida,
     required this.destinoId,
@@ -142,7 +142,7 @@ class Despacho {
       placa: d['placa'] ?? '',
       conductorNombre: d['conductorNombre'] ?? '',
       conductorCedula: d['conductorCedula'] ?? '',
-      conductorCelular: d['conductorCelular'] ?? '',
+      plancha: d['plancha'] ?? d['conductorCelular'] ?? '',
       capacidadKg: (d['capacidadKg'] ?? 0.0).toDouble(),
       horaSalida: d['horaSalida'] ?? '',
       destinoId: d['destinoId'] ?? '',
@@ -182,7 +182,7 @@ class Despacho {
         'placa': placa,
         'conductorNombre': conductorNombre,
         'conductorCedula': conductorCedula,
-        'conductorCelular': conductorCelular,
+        'plancha': plancha,
         'capacidadKg': capacidadKg,
         'horaSalida': horaSalida,
         'destinoId': destinoId,

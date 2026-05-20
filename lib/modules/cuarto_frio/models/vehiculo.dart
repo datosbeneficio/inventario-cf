@@ -5,7 +5,7 @@ class Vehiculo {
   final String placa;
   final String conductorNombre;
   final String conductorCedula;
-  final String conductorCelular;
+  final String plancha;
   final double capacidadKg;
   final bool activo;
 
@@ -14,7 +14,7 @@ class Vehiculo {
     required this.placa,
     required this.conductorNombre,
     required this.conductorCedula,
-    required this.conductorCelular,
+    required this.plancha,
     required this.capacidadKg,
     required this.activo,
   });
@@ -26,7 +26,7 @@ class Vehiculo {
       placa: d['placa'] ?? '',
       conductorNombre: d['conductorNombre'] ?? '',
       conductorCedula: d['conductorCedula'] ?? '',
-      conductorCelular: d['conductorCelular'] ?? '',
+      plancha: d['plancha'] ?? d['conductorCelular'] ?? '',
       capacidadKg: (d['capacidadKg'] ?? 0.0).toDouble(),
       activo: d['activo'] ?? true,
     );
@@ -36,7 +36,7 @@ class Vehiculo {
         'placa': placa.toUpperCase().trim(),
         'conductorNombre': conductorNombre.trim(),
         'conductorCedula': conductorCedula.trim(),
-        'conductorCelular': conductorCelular.trim(),
+        'plancha': plancha.trim(),
         'capacidadKg': capacidadKg,
         'activo': activo,
       };

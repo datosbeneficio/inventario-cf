@@ -253,7 +253,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         placa: _vehiculo!.placa,
         conductorNombre: _vehiculo!.conductorNombre,
         conductorCedula: _vehiculo!.conductorCedula,
-        conductorCelular: _vehiculo!.conductorCelular,
+        plancha: _vehiculo!.plancha,
         capacidadKg: double.parse(
             _capacidadCtrl.text.replaceAll(',', '.')),
         horaSalida: _horaSalidaStr,
@@ -380,9 +380,9 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                             label: 'CC',
                             value: _vehiculo!.conductorCedula),
                         _InfoRow(
-                            icon: Icons.phone,
-                            label: 'Cel.',
-                            value: _vehiculo!.conductorCelular),
+                            icon: Icons.grid_view,
+                            label: 'Plancha',
+                            value: _vehiculo!.plancha),
                       ]),
                     ],
                     const SizedBox(height: 12),
