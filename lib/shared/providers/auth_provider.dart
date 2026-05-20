@@ -7,9 +7,13 @@ import 'package:flutter/material.dart';
 const _kAuthDomain = '@avima.cf';
 
 /// Convierte un nickname a la dirección interna de Firebase Auth.
-/// Ejemplo: 'supervisor' → 'supervisor@avima.cf'
-String nicknameToEmail(String nickname) =>
-    '${nickname.trim().toLowerCase()}$_kAuthDomain';
+/// Si ya contiene '@' se usa tal cual (acepta ambos formatos).
+/// Ejemplos: 'supervisor' → 'supervisor@avima.cf'
+///           'supervisor@avima.cf' → 'supervisor@avima.cf'
+String nicknameToEmail(String nickname) {
+  final v = nickname.trim().toLowerCase();
+  return v.contains('@') ? v : '$v$_kAuthDomain';
+}
 
 /// Gestiona la sesión del usuario vía Firebase Auth.
 ///
