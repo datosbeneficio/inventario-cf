@@ -67,6 +67,19 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   /// Se activa al intentar confirmar sin fechas de vencimiento seleccionadas.
   bool _mostrarErrorVenc = false;
 
+  // ── Helpers de peso ───────────────────────────────────────────────────────
+
+  double get _pesoNeto =>
+      _lineas.fold(0.0, (s, l) => s + l.peso);
+  int get _totalCanastillas =>
+      _lineas.fold(0, (s, l) => s + l.canastillas);
+  double get _pesoBruto =>
+      _pesoNeto + (_totalCanastillas * kPesoCanastillaKg);
+
+  bool get _superaCapacidad =>
+      _vehiculo != null && _lineas.isNotEmpty &&
+      _pesoBruto > _vehiculo!.capacidadKg;
+
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
   @override
@@ -244,6 +257,15 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     }
     if (_lineas.isEmpty) {
       _showError('Agrega al menos una línea de producto');
+      return;
+    }
+
+    if (_superaCapacidad) {
+      _showError(
+        'Peso bruto (${formatKg(_pesoBruto)}) supera la capacidad del '
+        'vehículo (${formatKg(_vehiculo!.capacidadKg)}). '
+        'Reduce el producto o cambia de vehículo.',
+      );
       return;
     }
 
@@ -801,19 +823,66 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 
                     if (_lineas.isNotEmpty) ...[
                       const Divider(),
+                      // ── Totales ──────────────────────────────────────
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Text(
-                            'Total: '
-                            '${formatNum(_lineas.fold(0, (s, l) => s + l.canastillas))} canast. · '
-                            '${formatNum(_lineas.fold(0, (s, l) => s + l.unidades))} unid. · '
-                            '${formatKg(_lineas.fold(0.0, (s, l) => s + l.peso))}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${formatNum(_totalCanastillas)} canast. · '
+                                  '${formatNum(_lineas.fold(0, (s, l) => s + l.unidades))} unid.',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13),
+                                ),
+                                Text(
+                                  'Neto: ${formatKg(_pesoNeto)}   '
+                                  'Bruto: ${formatKg(_pesoBruto)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: _superaCapacidad
+                                        ? Colors.red
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                    fontWeight: _superaCapacidad
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          if (_vehiculo != null)
+                            _CapacidadChip(
+                              pesoBruto: _pesoBruto,
+                              capacidadKg: _vehiculo!.capacidadKg,
+                            ),
                         ],
                       ),
+                      // ── Alerta de sobrecarga ──────────────────────────
+                      if (_superaCapacidad)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded,
+                                  color: Colors.red, size: 16),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Peso bruto supera la capacidad del vehículo '
+                                  '(${formatKg(_vehiculo!.capacidadKg)}). '
+                                  'Reduce el producto o cambia de vehículo.',
+                                  style: const TextStyle(
+                                      color: Colors.red, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                     const SizedBox(height: 8),
 
@@ -1456,6 +1525,51 @@ class _InfoRow extends StatelessWidget {
                   color: cs.onSecondaryContainer)),
         ),
       ],
+    );
+  }
+}
+
+// ── Chip de capacidad del vehículo ────────────────────────────────────────────
+
+class _CapacidadChip extends StatelessWidget {
+  final double pesoBruto;
+  final double capacidadKg;
+  const _CapacidadChip(
+      {required this.pesoBruto, required this.capacidadKg});
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = capacidadKg > 0 ? (pesoBruto / capacidadKg) : 0.0;
+    final supera = pct > 1.0;
+    final color = supera
+        ? Colors.red
+        : pct > 0.9
+            ? Colors.orange
+            : Colors.green;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            supera ? '⚠ SOBRECARGA' : '${(pct * 100).toStringAsFixed(0)}% cargado',
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: color),
+          ),
+          Text(
+            '${formatKg(pesoBruto)} / ${formatKg(capacidadKg)}',
+            style: TextStyle(fontSize: 10, color: color),
+          ),
+        ],
+      ),
     );
   }
 }

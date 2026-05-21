@@ -145,6 +145,7 @@ class _InventarioCard extends StatelessWidget {
     final saldoUnid = entry.unidadesIn - entry.unidadesOut;
     final saldoCan = entry.canastillasIn - entry.canastillasOut;
     final saldoPeso = entry.pesoIn - entry.pesoOut;
+    final saldoPesoBruto = saldoPeso + (saldoCan * kPesoCanastillaKg);
 
     // Mostrar unidades como valor primario; canastillas como secundario
     // Si ambos son iguales (menudencias canastillas estándar) omitir línea canastillas
@@ -202,9 +203,16 @@ class _InventarioCard extends StatelessWidget {
                         fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 Text(
-                  formatKg(saldoPeso),
+                  'Neto: ${formatKg(saldoPeso)}',
                   style: TextStyle(
                       fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+                Text(
+                  'Bruto: ${formatKg(saldoPesoBruto)}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurfaceVariant,
+                      fontStyle: FontStyle.italic),
                 ),
               ],
             ),

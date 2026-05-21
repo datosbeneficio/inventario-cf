@@ -12,3 +12,8 @@ const String kTipoMenudencias = 'menudencias';
 // Subtipos de menudencias
 const String kSubtipoCanastillas = 'canastillas';
 const String kSubtipoPaquetes = 'paquetes';
+
+// ── Logística ─────────────────────────────────────────────────────────────────
+/// Peso estándar de una canastilla vacía en kg.
+/// Se usa para calcular Peso Bruto = Peso Neto + (canastillas × kPesoCanastillaKg).
+const double kPesoCanastillaKg = 2.0;
