@@ -17,6 +17,9 @@ class Ingreso {
   /// true si este ingreso fue creado automáticamente al reiniciar el ciclo
   /// para conservar producto del día anterior.
   final bool esRemanente;
+  /// Número de bloque de producción dentro del día (empieza en 1).
+  /// Permite agrupar entradas por tramos de trabajo del operario.
+  final int bloqueNro;
 
   const Ingreso({
     required this.id,
@@ -32,6 +35,7 @@ class Ingreso {
     required this.timestamp,
     this.creadoPor = '',
     this.esRemanente = false,
+    this.bloqueNro = 1,
   });
 
   factory Ingreso.fromDoc(DocumentSnapshot doc) {
@@ -52,6 +56,7 @@ class Ingreso {
           : DateTime.now(),
       creadoPor: d['creadoPor'] ?? '',
       esRemanente: d['esRemanente'] ?? false,
+      bloqueNro: d['bloqueNro'] ?? 1,
     );
   }
 
@@ -68,5 +73,6 @@ class Ingreso {
         'timestamp': FieldValue.serverTimestamp(),
         if (creadoPor.isNotEmpty) 'creadoPor': creadoPor,
         if (esRemanente) 'esRemanente': true,
+        'bloqueNro': bloqueNro,
       };
 }

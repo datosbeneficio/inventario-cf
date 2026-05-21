@@ -118,6 +118,7 @@ class FirestoreService {
     required bool esCola,
     required int unidades,
     bool esRemanente = false,
+    int bloqueNro = 1,
   }) =>
       _db.collection(_colIngresos).add({
         'clienteId': clienteId,
@@ -132,6 +133,7 @@ class FirestoreService {
         'timestamp': FieldValue.serverTimestamp(),
         if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
         if (esRemanente) 'esRemanente': true,
+        'bloqueNro': bloqueNro,
       });
 
   Future<void> updateIngreso(

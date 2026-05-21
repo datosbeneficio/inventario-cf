@@ -9,8 +9,8 @@ class MovimientoTile extends StatelessWidget {
   final bool esCola;
   final int canastillas;
   final DateTime timestamp;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const MovimientoTile({
     super.key,
@@ -20,8 +20,8 @@ class MovimientoTile extends StatelessWidget {
     required this.esCola,
     required this.canastillas,
     required this.timestamp,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
     this.clienteNombre,
   });
 
@@ -77,17 +77,19 @@ class MovimientoTile extends StatelessWidget {
               formatTime(timestamp),
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20),
-              onPressed: onEdit,
-              tooltip: 'Editar',
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline,
-                  size: 20, color: Colors.red),
-              onPressed: onDelete,
-              tooltip: 'Eliminar',
-            ),
+            if (onEdit != null)
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                onPressed: onEdit,
+                tooltip: 'Editar',
+              ),
+            if (onDelete != null)
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    size: 20, color: Colors.red),
+                onPressed: onDelete,
+                tooltip: 'Eliminar',
+              ),
           ],
         ),
       ),

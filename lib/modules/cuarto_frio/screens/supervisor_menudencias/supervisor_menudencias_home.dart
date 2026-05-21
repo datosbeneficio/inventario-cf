@@ -5,8 +5,9 @@ import '../../../../shared/models/cliente.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/services/firestore_service.dart';
 import '../../widgets/menudencias_form.dart';
-import '../../../../shared/widgets/movimiento_tile.dart';
 import '../../widgets/inventario_panel.dart';
+import '../../widgets/historial_ingresos_panel.dart';
+import '../../../../shared/widgets/movimiento_tile.dart';
 import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/calculadora_dialog.dart';
 import '../../../../shared/widgets/confirm_delete_dialog.dart';
@@ -24,8 +25,48 @@ class SupervisorMenudenciasHome extends StatefulWidget {
 class _SupervisorMenudenciasHomeState
     extends State<SupervisorMenudenciasHome> {
   int _tab = 0;
+  int _bloqueActual = 1;
 
-  static const _titles = ['Inventario Menudencias', 'Registrar Ingreso'];
+  static const _titles = [
+    'Inventario Menudencias',
+    'Registrar Ingreso',
+    'Historial',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sincronizarBloque());
+  }
+
+  /// Al iniciar, detecta el bloque más alto del día actual para no
+  /// reiniciar el contador si el operario recarga la página.
+  void _sincronizarBloque() {
+    if (!mounted) return;
+    final hoy = DateTime.now();
+    final ingresos = context.read<List<Ingreso>>();
+    int max = 1;
+    for (final i in ingresos) {
+      if (i.rangoTipo == kTipoMenudencias &&
+          i.timestamp.year == hoy.year &&
+          i.timestamp.month == hoy.month &&
+          i.timestamp.day == hoy.day) {
+        if (i.bloqueNro > max) max = i.bloqueNro;
+      }
+    }
+    if (max != _bloqueActual) setState(() => _bloqueActual = max);
+  }
+
+  void _nuevoBloque() {
+    setState(() => _bloqueActual++);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Bloque $_bloqueActual iniciado'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +89,13 @@ class _SupervisorMenudenciasHomeState
       ),
       body: IndexedStack(
         index: _tab,
-        children: const [
-          InventarioPanel(soloTipo: kTipoMenudencias),
-          _IngresoMenudBody(),
+        children: [
+          const InventarioPanel(soloTipo: kTipoMenudencias),
+          _IngresoMenudBody(
+            bloqueActual: _bloqueActual,
+            onNuevoBloque: _nuevoBloque,
+          ),
+          const HistorialIngresosPanel(rangoTipo: kTipoMenudencias),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -61,6 +106,8 @@ class _SupervisorMenudenciasHomeState
               icon: Icon(Icons.inventory_2), label: 'Inventario'),
           NavigationDestination(
               icon: Icon(Icons.add_box), label: 'Registrar'),
+          NavigationDestination(
+              icon: Icon(Icons.history), label: 'Historial'),
         ],
       ),
     );
@@ -70,23 +117,33 @@ class _SupervisorMenudenciasHomeState
 // ── Pestaña registro de ingreso de menudencias ─────────────────────────────
 
 class _IngresoMenudBody extends StatelessWidget {
-  const _IngresoMenudBody();
+  final int bloqueActual;
+  final VoidCallback onNuevoBloque;
+
+  const _IngresoMenudBody({
+    required this.bloqueActual,
+    required this.onNuevoBloque,
+  });
 
   @override
   Widget build(BuildContext context) {
     final todos = context.watch<List<Ingreso>>();
-    final hoy = todos
+    final hoy = DateTime.now();
+    final hoysIngresos = todos
         .where((i) =>
             i.rangoTipo == kTipoMenudencias &&
-            i.timestamp.year == DateTime.now().year &&
-            i.timestamp.month == DateTime.now().month &&
-            i.timestamp.day == DateTime.now().day)
+            i.timestamp.year == hoy.year &&
+            i.timestamp.month == hoy.month &&
+            i.timestamp.day == hoy.day)
         .toList();
 
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        final form = _FormPanel();
-        final list = _ListaIngresos(ingresos: hoy);
+        final form = _FormPanel(
+          bloqueActual: bloqueActual,
+          onNuevoBloque: onNuevoBloque,
+        );
+        final list = _ListaIngresos(ingresos: hoysIngresos);
         if (constraints.maxWidth >= 700) {
           return Row(children: [
             SizedBox(width: 380, child: form),
@@ -104,14 +161,53 @@ class _IngresoMenudBody extends StatelessWidget {
   }
 }
 
+// ── Formulario ────────────────────────────────────────────────────────────────
+
 class _FormPanel extends StatelessWidget {
+  final int bloqueActual;
+  final VoidCallback onNuevoBloque;
+
+  const _FormPanel({
+    required this.bloqueActual,
+    required this.onNuevoBloque,
+  });
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Indicador de bloque activo ──────────────────────────────
+          Row(
+            children: [
+              Chip(
+                avatar: Icon(Icons.workspaces_outlined,
+                    size: 14, color: cs.onTertiaryContainer),
+                label: Text(
+                  'Bloque $bloqueActual en curso',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onTertiaryContainer,
+                  ),
+                ),
+                backgroundColor: cs.tertiaryContainer,
+                side: BorderSide.none,
+                padding: EdgeInsets.zero,
+              ),
+              const Spacer(),
+              TextButton.icon(
+                icon: const Icon(Icons.add_box_outlined, size: 16),
+                label: const Text('Nuevo bloque'),
+                onPressed: onNuevoBloque,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
           Text(
             'Registrar Ingreso — Menudencias',
             style: Theme.of(context)
@@ -141,6 +237,7 @@ class _FormPanel extends StatelessWidget {
               peso: peso,
               esCola: false,
               unidades: unidades,
+              bloqueNro: bloqueActual,
             ),
           ),
         ],
@@ -149,7 +246,7 @@ class _FormPanel extends StatelessWidget {
   }
 }
 
-// ── Lista de ingresos del día ─────────────────────────────────────────────
+// ── Lista de ingresos del día agrupada por bloque ─────────────────────────────
 
 class _ListaIngresos extends StatelessWidget {
   final List<Ingreso> ingresos;
@@ -161,59 +258,100 @@ class _ListaIngresos extends StatelessWidget {
       return const Center(child: Text('Sin ingresos de menudencias hoy'));
     }
 
+    final cs = Theme.of(context).colorScheme;
     final totalCan = ingresos.fold(0, (s, i) => s + i.canastillas);
     final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
+    // Agrupar por bloque (orden ascendente)
+    final Map<int, List<Ingreso>> porBloque = {};
+    for (final i in ingresos) {
+      porBloque.putIfAbsent(i.bloqueNro, () => []).add(i);
+    }
+    final bloques = porBloque.keys.toList()..sort();
+
+    // Construir lista plana con encabezados de bloque
+    final List<Widget> items = [];
+
+    // Resumen global
+    items.add(Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: Row(
+        children: [
+          Text('Ingresos de hoy (${ingresos.length})',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('Ingresos de hoy (${ingresos.length})',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('${formatNum(totalCan)} canastillas',
-                      style: const TextStyle(fontSize: 12)),
-                  Text(formatKg(totalPeso),
-                      style: const TextStyle(fontSize: 12)),
-                ],
-              ),
+              Text('${formatNum(totalCan)} canastillas',
+                  style: const TextStyle(fontSize: 12)),
+              Text(formatKg(totalPeso),
+                  style: const TextStyle(fontSize: 12)),
             ],
           ),
+        ],
+      ),
+    ));
+
+    for (final nro in bloques) {
+      final entries = porBloque[nro]!;
+      final bCan = entries.fold(0, (s, i) => s + i.canastillas);
+      final bPeso = entries.fold(0.0, (s, i) => s + i.peso);
+
+      // Encabezado de bloque
+      items.add(Container(
+        color: cs.surfaceContainerLow,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        child: Row(
+          children: [
+            Icon(Icons.workspaces_outlined, size: 14, color: cs.tertiary),
+            const SizedBox(width: 6),
+            Text(
+              'Bloque $nro',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: cs.tertiary),
+            ),
+            const Spacer(),
+            Text(
+              '${formatNum(bCan)} can. · ${formatKg(bPeso)}',
+              style:
+                  TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          ],
         ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: ingresos.length,
-            itemBuilder: (ctx, i) {
-              final ingreso = ingresos[i];
-              return MovimientoTile(
-                rangoNombre: ingreso.rangoNombre,
-                clienteNombre: ingreso.clienteNombre.isNotEmpty
-                    ? ingreso.clienteNombre
-                    : null,
-                unidades: ingreso.unidades,
-                peso: ingreso.peso,
-                esCola: false,
-                canastillas: ingreso.canastillas,
-                timestamp: ingreso.timestamp,
-                onEdit: () => _showEditDialog(context, ingreso),
-                onDelete: () async {
-                  final ok = await showConfirmDelete(
-                      ctx,
-                      '${ingreso.rangoNombre} — '
-                      '${formatNum(ingreso.canastillas)} canastillas');
-                  if (ok) FirestoreService.instance.deleteIngreso(ingreso.id);
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
+      ));
+
+      // Entradas del bloque
+      for (final ingreso in entries) {
+        items.add(MovimientoTile(
+          rangoNombre: ingreso.rangoNombre,
+          clienteNombre: ingreso.clienteNombre.isNotEmpty
+              ? ingreso.clienteNombre
+              : null,
+          unidades: ingreso.unidades,
+          peso: ingreso.peso,
+          esCola: false,
+          canastillas: ingreso.canastillas,
+          timestamp: ingreso.timestamp,
+          onEdit: () => _showEditDialog(context, ingreso),
+          onDelete: () async {
+            final ok = await showConfirmDelete(
+                context,
+                '${ingreso.rangoNombre} — '
+                '${formatNum(ingreso.canastillas)} canastillas');
+            if (ok) {
+              FirestoreService.instance.deleteIngreso(ingreso.id);
+            }
+          },
+        ));
+      }
+    }
+
+    items.add(const SizedBox(height: 16));
+
+    return ListView(children: items);
   }
 
   void _showEditDialog(BuildContext context, Ingreso ingreso) {

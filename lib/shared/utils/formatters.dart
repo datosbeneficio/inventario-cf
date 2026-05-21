@@ -1,11 +1,14 @@
 import 'package:intl/intl.dart';
 
 final _dateFormat = DateFormat('dd/MM/yyyy');
+final _dateLongFormat = DateFormat("EEEE d 'de' MMMM yyyy", 'es');
 final _timeFormat = DateFormat('HH:mm');
 final _dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm');
 final _numberFormat = NumberFormat('#,##0.##', 'es');
 
 String formatDate(DateTime dt) => _dateFormat.format(dt);
+/// Ej: "miércoles 21 de mayo 2026"
+String formatDateLong(DateTime dt) => _dateLongFormat.format(dt);
 String formatTime(DateTime dt) => _timeFormat.format(dt);
 String formatDateTime(DateTime dt) => _dateTimeFormat.format(dt);
 String formatNum(num value) => _numberFormat.format(value);
