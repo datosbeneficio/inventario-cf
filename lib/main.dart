@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
+import 'shared/providers/connectivity_provider.dart';
 import 'shared/models/ciclo_config.dart';
 import 'shared/models/cliente.dart';
 import 'modules/cuarto_frio/models/ingreso.dart';
@@ -18,10 +20,19 @@ import 'app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Persistencia offline: Firestore guarda una copia local en IndexedDB
+  // y encola escrituras para sincronizar al reconectar.
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
         StreamProvider<List<Cliente>>(
           create: (_) => FirestoreService.instance.clientesStream(),
           initialData: const [],
