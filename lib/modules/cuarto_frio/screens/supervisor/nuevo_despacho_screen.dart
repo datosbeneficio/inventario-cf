@@ -800,9 +800,32 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                                     : cs.onTertiaryContainer,
                               ),
                             ),
-                            title: Text(
-                                '${l.clienteNombre} · ${l.rangoNombre}',
-                                style: const TextStyle(fontSize: 13)),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${l.clienteNombre} · ${l.rangoNombre}',
+                                    style: const TextStyle(fontSize: 13)),
+                                ),
+                                if (l.esRemanente)
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: cs.tertiaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'DÍA ANT.',
+                                      style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: cs.onTertiaryContainer),
+                                    ),
+                                  ),
+                              ],
+                            ),
                             subtitle: Text(
                               '${formatNum(l.canastillas)} canast. · '
                               '${formatNum(l.unidades)} unid. · '
@@ -938,12 +961,17 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         .where((s) => !s.timestamp.isBefore(ciclo.inicio))
         .toList();
 
-    // Compute saldo map
-    final saldoMap = <String, ({int canastillas, int unidades, double peso})>{};
+    // Separar saldos: stock nuevo vs. remanente
+    final saldoNuevoMap =
+        <String, ({int canastillas, int unidades, double peso})>{};
+    final saldoRemaneMap =
+        <String, ({int canastillas, int unidades, double peso})>{};
+
     for (final i in ingresos) {
       final k = '${i.clienteId}|${i.rangoId}';
-      final p = saldoMap[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
-      saldoMap[k] = (
+      final target = i.esRemanente ? saldoRemaneMap : saldoNuevoMap;
+      final p = target[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
+      target[k] = (
         canastillas: p.canastillas + i.canastillas,
         unidades: p.unidades + i.unidades,
         peso: p.peso + i.peso,
@@ -951,22 +979,24 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     }
     for (final s in salidas) {
       final k = '${s.clienteId}|${s.rangoId}';
-      final p = saldoMap[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
-      saldoMap[k] = (
+      final target = s.esRemanente ? saldoRemaneMap : saldoNuevoMap;
+      final p = target[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
+      target[k] = (
         canastillas: p.canastillas - s.canastillas,
         unidades: p.unidades - s.unidades,
         peso: p.peso - s.peso,
       );
     }
 
-    // Restar líneas ya comprometidas en este despacho (aún no guardadas en Firestore)
+    // Restar líneas ya comprometidas en este despacho (aún no guardadas)
     for (final l in _lineas) {
       final k = '${l.clienteId}|${l.rangoId}';
-      final p = saldoMap[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
-      saldoMap[k] = (
+      final target = l.esRemanente ? saldoRemaneMap : saldoNuevoMap;
+      final p = target[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
+      target[k] = (
         canastillas: p.canastillas - l.canastillas,
-        unidades:    p.unidades    - l.unidades,
-        peso:        p.peso        - l.peso,
+        unidades: p.unidades - l.unidades,
+        peso: p.peso - l.peso,
       );
     }
 
@@ -974,13 +1004,15 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       context: context,
       builder: (ctx) => _AgregarLineaDialog(
         clientes: clientes,
-        saldoMap: saldoMap,
+        saldoMap: saldoNuevoMap,
+        saldoRemaneMap: saldoRemaneMap,
         onAgregar: (linea) => setState(() {
-          // Acumular en la línea existente si coincide cliente + rango + esCola
+          // Acumular en la línea existente si coincide cliente + rango + esCola + esRemanente
           final idx = _lineas.indexWhere((l) =>
               l.clienteId == linea.clienteId &&
               l.rangoId == linea.rangoId &&
-              l.esCola == linea.esCola);
+              l.esCola == linea.esCola &&
+              l.esRemanente == linea.esRemanente);
           if (idx >= 0) {
             final e = _lineas[idx];
             _lineas[idx] = DespachoLinea(
@@ -993,6 +1025,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
               unidades: e.unidades + linea.unidades,
               peso: e.peso + linea.peso,
               esCola: e.esCola,
+              esRemanente: e.esRemanente,
             );
           } else {
             _lineas.add(linea);
@@ -1186,12 +1219,16 @@ class _PrecintoFotoWidget extends StatelessWidget {
 
 class _AgregarLineaDialog extends StatefulWidget {
   final List<Cliente> clientes;
+  /// Stock del día actual (ingresos no-remanente − salidas no-remanente)
   final Map<String, ({int canastillas, int unidades, double peso})> saldoMap;
+  /// Stock remanente del día anterior
+  final Map<String, ({int canastillas, int unidades, double peso})> saldoRemaneMap;
   final void Function(DespachoLinea) onAgregar;
 
   const _AgregarLineaDialog({
     required this.clientes,
     required this.saldoMap,
+    required this.saldoRemaneMap,
     required this.onAgregar,
   });
 
@@ -1205,11 +1242,19 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
   final _canCtrl = TextEditingController();
   final _pesoCtrl = TextEditingController();
   bool _esCola = false;
+  bool _esRemanente = false;
   final _formKey = GlobalKey<FormState>();
+
+  Map<String, ({int canastillas, int unidades, double peso})>
+      get _mapaActivo =>
+          _esRemanente ? widget.saldoRemaneMap : widget.saldoMap;
+
+  bool get _hayRemanente => widget.saldoRemaneMap.values
+      .any((s) => s.canastillas > 0 || s.unidades > 0);
 
   ({int canastillas, int unidades, double peso})? get _saldo {
     if (_clienteId == null || _rango == null) return null;
-    return widget.saldoMap['$_clienteId|${_rango!.id}'];
+    return _mapaActivo['$_clienteId|${_rango!.id}'];
   }
 
   int get _canastillas => int.tryParse(_canCtrl.text) ?? 0;
@@ -1235,14 +1280,41 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
     return AlertDialog(
       title: const Text('Agregar línea'),
       content: SizedBox(
-        width: 360,
+        width: 380,
         child: SingleChildScrollView(
           child: Form(
             key: _formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Cliente
+                // ── Toggle Hoy / Remanente (solo si hay remanente) ──────────
+                if (_hayRemanente) ...[
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        label: Text('Stock del día'),
+                        icon: Icon(Icons.inventory_2_outlined, size: 16),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        label: Text('Remanente (día ant.)'),
+                        icon: Icon(Icons.history, size: 16),
+                      ),
+                    ],
+                    selected: {_esRemanente},
+                    onSelectionChanged: (sel) => setState(() {
+                      _esRemanente = sel.first;
+                      _rango = null;
+                      _canCtrl.clear();
+                      _pesoCtrl.clear();
+                      _esCola = false;
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // ── Cliente ─────────────────────────────────────────────────
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
                     labelText: 'Cliente',
@@ -1263,13 +1335,13 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                 ),
                 const SizedBox(height: 12),
 
-                // Rango (stream filtrado por stock)
+                // ── Rango (filtrado por mapa activo) ─────────────────────────
                 if (_clienteId != null)
                   StreamBuilder<List<Rango>>(
                     stream: FirestoreService.instance
                         .rangosStream(_clienteId!)
                         .map((rs) => rs.where((r) {
-                              final s = widget.saldoMap[
+                              final s = _mapaActivo[
                                   '$_clienteId|${r.id}'];
                               return s != null &&
                                   (s.canastillas > 0 || s.unidades > 0);
@@ -1285,7 +1357,9 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                           padding: const EdgeInsets.symmetric(
                               vertical: 8),
                           child: Text(
-                            'Sin rangos con inventario disponible.',
+                            _esRemanente
+                                ? 'Sin remanente disponible para este cliente.'
+                                : 'Sin rangos con inventario disponible.',
                             style: TextStyle(
                                 fontSize: 12,
                                 color: cs.onSurfaceVariant),
@@ -1293,10 +1367,18 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                         );
                       }
                       return DropdownButtonFormField<String>(
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Rango',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.category),
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.category),
+                          suffixIcon: _esRemanente
+                              ? Tooltip(
+                                  message: 'Producto del día anterior',
+                                  child: Icon(Icons.history,
+                                      size: 16,
+                                      color: cs.tertiary),
+                                )
+                              : null,
                         ),
                         initialValue: val,
                         items: rangos
@@ -1318,21 +1400,29 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                     },
                   ),
 
-                // Info stock disponible
+                // ── Info stock disponible ────────────────────────────────────
                 if (saldo != null) ...[
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: cs.secondaryContainer,
+                      color: _esRemanente
+                          ? cs.tertiaryContainer
+                          : cs.secondaryContainer,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.inventory_2,
-                            size: 14,
-                            color: cs.onSecondaryContainer),
+                        Icon(
+                          _esRemanente
+                              ? Icons.history
+                              : Icons.inventory_2,
+                          size: 14,
+                          color: _esRemanente
+                              ? cs.onTertiaryContainer
+                              : cs.onSecondaryContainer,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -1341,7 +1431,9 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                             '${formatKg(saldo.peso)}',
                             style: TextStyle(
                                 fontSize: 11,
-                                color: cs.onSecondaryContainer),
+                                color: _esRemanente
+                                    ? cs.onTertiaryContainer
+                                    : cs.onSecondaryContainer),
                           ),
                         ),
                       ],
@@ -1349,7 +1441,7 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                   ),
                 ],
 
-                // Toggle Cola (solo aves)
+                // ── Toggle Cola (solo aves) ──────────────────────────────────
                 if (_rango != null && esAves) ...[
                   const SizedBox(height: 8),
                   SwitchListTile(
@@ -1366,7 +1458,7 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
 
                 if (_rango != null) ...[
                   const SizedBox(height: 8),
-                  // Canastillas / Unidades
+                  // ── Canastillas / Unidades ──────────────────────────────
                   TextFormField(
                     controller: _canCtrl,
                     keyboardType: TextInputType.number,
@@ -1466,6 +1558,7 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                       unidades: _unidades,
                       peso: peso,
                       esCola: _esCola,
+                      esRemanente: _esRemanente,
                     ),
                   );
                   Navigator.pop(context);

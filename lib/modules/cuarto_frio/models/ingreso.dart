@@ -14,6 +14,9 @@ class Ingreso {
   final DateTime timestamp;
   /// Email del usuario que registró el movimiento.
   final String creadoPor;
+  /// true si este ingreso fue creado automáticamente al reiniciar el ciclo
+  /// para conservar producto del día anterior.
+  final bool esRemanente;
 
   const Ingreso({
     required this.id,
@@ -28,6 +31,7 @@ class Ingreso {
     required this.unidades,
     required this.timestamp,
     this.creadoPor = '',
+    this.esRemanente = false,
   });
 
   factory Ingreso.fromDoc(DocumentSnapshot doc) {
@@ -47,6 +51,7 @@ class Ingreso {
           ? (d['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
       creadoPor: d['creadoPor'] ?? '',
+      esRemanente: d['esRemanente'] ?? false,
     );
   }
 
@@ -62,5 +67,6 @@ class Ingreso {
         'unidades': unidades,
         'timestamp': FieldValue.serverTimestamp(),
         if (creadoPor.isNotEmpty) 'creadoPor': creadoPor,
+        if (esRemanente) 'esRemanente': true,
       };
 }

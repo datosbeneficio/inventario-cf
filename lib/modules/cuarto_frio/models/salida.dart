@@ -15,6 +15,8 @@ class Salida {
   final String? despachoId;
   /// Email del usuario que registró el movimiento.
   final String creadoPor;
+  /// true si la salida corresponde a despacho de producto remanente (día anterior).
+  final bool esRemanente;
 
   const Salida({
     required this.id,
@@ -30,6 +32,7 @@ class Salida {
     required this.timestamp,
     this.despachoId,
     this.creadoPor = '',
+    this.esRemanente = false,
   });
 
   factory Salida.fromDoc(DocumentSnapshot doc) {
@@ -50,6 +53,7 @@ class Salida {
           : DateTime.now(),
       despachoId: d['despachoId'] as String?,
       creadoPor: d['creadoPor'] ?? '',
+      esRemanente: d['esRemanente'] ?? false,
     );
   }
 

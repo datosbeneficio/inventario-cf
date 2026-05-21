@@ -169,6 +169,8 @@ class _RendimientoView extends StatelessWidget {
       return const Center(child: Text('Sin movimientos en este período'));
     }
 
+    final haySalidas = salidas.isNotEmpty;
+
     // Clave de agrupación
     String keyOf(String cliente, String rango) =>
         mostrarCliente ? '$cliente||$rango' : rango;
@@ -245,15 +247,42 @@ class _RendimientoView extends StatelessWidget {
                 color: cs.secondaryContainer,
               ),
               const SizedBox(width: 8),
-              _SummaryCard(
-                label: 'Merma',
-                value: formatKg(totalMermaKg),
-                sub: '${formatNum(totalMermaP)}%',
-                icon: Icons.trending_down,
-                color: totalMermaKg > 0
-                    ? cs.errorContainer
-                    : cs.tertiaryContainer,
-              ),
+              if (haySalidas)
+                _SummaryCard(
+                  label: 'Merma',
+                  value: formatKg(totalMermaKg),
+                  sub: '${formatNum(totalMermaP)}%',
+                  icon: Icons.trending_down,
+                  color: totalMermaKg > 0
+                      ? cs.errorContainer
+                      : cs.tertiaryContainer,
+                )
+              else
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.trending_down,
+                            size: 16, color: cs.onSurfaceVariant),
+                        const SizedBox(height: 4),
+                        Text('Merma',
+                            style: TextStyle(
+                                fontSize: 11, color: cs.onSurfaceVariant)),
+                        Text('Sin despachos',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurfaceVariant,
+                                fontStyle: FontStyle.italic)),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -279,8 +308,10 @@ class _RendimientoView extends StatelessWidget {
                 _LegendDot(color: colorIn, label: 'Ingresado'),
                 const SizedBox(width: 12),
                 _LegendDot(color: cs.secondary, label: 'Despachado'),
-                const SizedBox(width: 12),
-                _LegendDot(color: cs.error, label: 'Merma'),
+                if (haySalidas) ...[
+                  const SizedBox(width: 12),
+                  _LegendDot(color: cs.error, label: 'Merma'),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -304,8 +335,10 @@ class _RendimientoView extends StatelessWidget {
                 const DataColumn(label: Text('Peso Ing.'), numeric: true),
                 const DataColumn(label: Text('Can. Sal.'), numeric: true),
                 const DataColumn(label: Text('Peso Sal.'), numeric: true),
-                const DataColumn(label: Text('Merma (kg)'), numeric: true),
-                const DataColumn(label: Text('Merma %'), numeric: true),
+                if (haySalidas)
+                  const DataColumn(label: Text('Merma (kg)'), numeric: true),
+                if (haySalidas)
+                  const DataColumn(label: Text('Merma %'), numeric: true),
               ],
               rows: [
                 ...rows.map((r) => DataRow(cells: [
@@ -315,8 +348,9 @@ class _RendimientoView extends StatelessWidget {
                       DataCell(Text(formatKg(r.pesoIn))),
                       DataCell(Text(formatNum(r.canOut))),
                       DataCell(Text(formatKg(r.pesoOut))),
-                      DataCell(Text(formatKg(r.mermaKg))),
-                      DataCell(Text('${formatNum(r.mermaP)}%')),
+                      if (haySalidas) DataCell(Text(formatKg(r.mermaKg))),
+                      if (haySalidas)
+                        DataCell(Text('${formatNum(r.mermaP)}%')),
                     ])),
                 DataRow(
                   color: WidgetStateProperty.all(cs.secondaryContainer),
@@ -332,10 +366,14 @@ class _RendimientoView extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.bold))),
                     DataCell(Text(formatKg(totalPesoOut),
                         style: const TextStyle(fontWeight: FontWeight.bold))),
-                    DataCell(Text(formatKg(totalMermaKg),
-                        style: const TextStyle(fontWeight: FontWeight.bold))),
-                    DataCell(Text('${formatNum(totalMermaP)}%',
-                        style: const TextStyle(fontWeight: FontWeight.bold))),
+                    if (haySalidas)
+                      DataCell(Text(formatKg(totalMermaKg),
+                          style:
+                              const TextStyle(fontWeight: FontWeight.bold))),
+                    if (haySalidas)
+                      DataCell(Text('${formatNum(totalMermaP)}%',
+                          style:
+                              const TextStyle(fontWeight: FontWeight.bold))),
                   ],
                 ),
               ],
@@ -366,6 +404,7 @@ class _PesoBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final haySalidas = rows.any((r) => r.pesoOut > 0);
     final groups = rows.asMap().entries.map((e) {
       final idx = e.key;
       final r = e.value;
@@ -386,13 +425,14 @@ class _PesoBarChart extends StatelessWidget {
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(4)),
           ),
-          BarChartRodData(
-            toY: r.mermaKg < 0 ? 0 : r.mermaKg,
-            color: colorMerma,
-            width: 12,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(4)),
-          ),
+          if (haySalidas)
+            BarChartRodData(
+              toY: r.mermaKg < 0 ? 0 : r.mermaKg,
+              color: colorMerma,
+              width: 12,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(4)),
+            ),
         ],
         barsSpace: 3,
       );
@@ -436,7 +476,9 @@ class _PesoBarChart extends StatelessWidget {
           touchTooltipData: BarTouchTooltipData(
             getTooltipItem: (group, _, rod, rodIdx) {
               final r = rows[group.x];
-              final labels = ['Ingresado', 'Despachado', 'Merma'];
+              final labels = haySalidas
+                  ? ['Ingresado', 'Despachado', 'Merma']
+                  : ['Ingresado', 'Despachado'];
               final canLabel = rodIdx == 0
                   ? '${formatNum(r.canIn)} canast.'
                   : rodIdx == 1

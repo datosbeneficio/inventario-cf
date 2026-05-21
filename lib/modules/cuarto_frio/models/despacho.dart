@@ -12,6 +12,8 @@ class DespachoLinea {
   final int unidades;
   final double peso;
   final bool esCola;
+  /// true si esta línea corresponde a producto remanente del día anterior.
+  final bool esRemanente;
 
   const DespachoLinea({
     required this.clienteId,
@@ -23,6 +25,7 @@ class DespachoLinea {
     required this.unidades,
     required this.peso,
     required this.esCola,
+    this.esRemanente = false,
   });
 
   factory DespachoLinea.fromMap(Map<String, dynamic> m) => DespachoLinea(
@@ -35,6 +38,7 @@ class DespachoLinea {
         unidades: m['unidades'] ?? 0,
         peso: (m['peso'] ?? 0.0).toDouble(),
         esCola: m['esCola'] ?? false,
+        esRemanente: m['esRemanente'] ?? false,
       );
 
   Map<String, dynamic> toMap() => {
@@ -47,6 +51,7 @@ class DespachoLinea {
         'unidades': unidades,
         'peso': peso,
         'esCola': esCola,
+        if (esRemanente) 'esRemanente': true,
       };
 
   /// Serializa esta línea como documento de `salidas` (con despachoId y creadoPor inyectados).

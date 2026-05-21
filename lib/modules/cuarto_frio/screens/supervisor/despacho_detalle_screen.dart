@@ -355,7 +355,37 @@ class _LineasCard extends StatelessWidget {
             ...d.lineas.map(
               (l) => DataRow(cells: [
                 DataCell(Text(l.clienteNombre)),
-                DataCell(Text(l.rangoNombre)),
+                DataCell(
+                  l.esRemanente
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(l.rangoNombre),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .tertiaryContainer,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                'DÍA ANT.',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onTertiaryContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Text(l.rangoNombre),
+                ),
                 DataCell(Text(formatNum(l.canastillas))),
                 DataCell(Text(formatNum(l.unidades))),
                 DataCell(

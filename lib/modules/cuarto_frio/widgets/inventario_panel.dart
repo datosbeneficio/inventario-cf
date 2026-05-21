@@ -45,6 +45,7 @@ class InventarioPanel extends StatelessWidget {
       map[key]!.unidadesIn += i.unidades;
       map[key]!.canastillasIn += i.canastillas;
       map[key]!.pesoIn += i.peso;
+      if (i.esRemanente) map[key]!.tieneRemanente = true;
     }
 
     for (final s in salidas) {
@@ -168,9 +169,35 @@ class _InventarioCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(entry.rangoNombre,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 14)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(entry.rangoNombre,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                      ),
+                      if (entry.tieneRemanente)
+                        Container(
+                          margin: const EdgeInsets.only(left: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: Colors.amber.shade400, width: 0.5),
+                          ),
+                          child: Text(
+                            'DÍA ANT.',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 2),
                   Row(
                     children: [
@@ -237,6 +264,7 @@ class _Saldo {
   int canastillasOut = 0;
   double pesoIn = 0;
   double pesoOut = 0;
+  bool tieneRemanente = false;
 
   _Saldo({
     required this.clienteId,

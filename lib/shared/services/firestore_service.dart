@@ -117,6 +117,7 @@ class FirestoreService {
     required double peso,
     required bool esCola,
     required int unidades,
+    bool esRemanente = false,
   }) =>
       _db.collection(_colIngresos).add({
         'clienteId': clienteId,
@@ -130,6 +131,7 @@ class FirestoreService {
         'unidades': unidades,
         'timestamp': FieldValue.serverTimestamp(),
         if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
+        if (esRemanente) 'esRemanente': true,
       });
 
   Future<void> updateIngreso(
@@ -392,6 +394,45 @@ class FirestoreService {
         'inicio': FieldValue.serverTimestamp(),
         'cicloId': const Uuid().v4(),
       });
+
+  /// Reinicia el ciclo Y crea ingresos remanente en una sola operación atómica.
+  /// [items] son los registros de producto que se trasladan al nuevo ciclo.
+  Future<void> resetCicloConRemanente(
+      List<({
+        String clienteId,
+        String clienteNombre,
+        String rangoId,
+        String rangoNombre,
+        String rangoTipo,
+        int canastillas,
+        int unidades,
+        double peso,
+        bool esCola,
+      })> items) async {
+    final batch = _db.batch();
+    batch.set(_db.collection('config').doc('ciclo'), {
+      'inicio': FieldValue.serverTimestamp(),
+      'cicloId': const Uuid().v4(),
+    });
+    for (final item in items) {
+      final ref = _db.collection(_colIngresos).doc();
+      batch.set(ref, {
+        'clienteId': item.clienteId,
+        'clienteNombre': item.clienteNombre,
+        'rangoId': item.rangoId,
+        'rangoNombre': item.rangoNombre,
+        'rangoTipo': item.rangoTipo,
+        'canastillas': item.canastillas,
+        'unidades': item.unidades,
+        'peso': item.peso,
+        'esCola': item.esCola,
+        'esRemanente': true,
+        'timestamp': FieldValue.serverTimestamp(),
+        if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
+      });
+    }
+    await batch.commit();
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 

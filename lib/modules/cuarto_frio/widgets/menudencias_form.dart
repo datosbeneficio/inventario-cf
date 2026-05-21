@@ -122,9 +122,9 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
   }
 
   Future<void> _submit(List<Cliente> clientes) async {
-    if (_rangoObj == null) setState(() => _showRangoError = true);
+    if (_rangoObj == null) { setState(() => _showRangoError = true); }
     if (!_formKey.currentState!.validate() || _rangoObj == null ||
-        _clienteId == null) return;
+        _clienteId == null) { return; }
     final cliente = clientes.firstWhere((c) => c.id == _clienteId);
     final canastillas = _canastillas;
     final unidades = _esPaquetes

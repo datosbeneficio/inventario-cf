@@ -212,7 +212,27 @@ pw.Widget _lineasTable(Despacho d) {
         final esAves = l.rangoTipo == kTipoAves && l.unidades > 0;
         return pw.TableRow(children: [
           _cell(l.clienteNombre, cellStyle),
-          _cell(l.rangoNombre, cellStyle),
+          // Celda de rango: añadir etiqueta "DÍA ANT." para remanente
+          l.esRemanente
+              ? pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 3),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(l.rangoNombre, style: cellStyle),
+                      pw.Text(
+                        'DÍA ANT.',
+                        style: pw.TextStyle(
+                          fontSize: 6,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.orange800,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : _cell(l.rangoNombre, cellStyle),
           _cell(formatNum(l.canastillas), cellStyle),
           _cell(formatNum(l.unidades), cellStyle),
           esAves
