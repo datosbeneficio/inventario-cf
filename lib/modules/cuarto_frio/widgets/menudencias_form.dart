@@ -59,6 +59,7 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
   final _canastillasCtrl = TextEditingController();
   final _pesoCtrl = TextEditingController();
   bool _submitting = false;
+  bool _showRangoError = false;
 
   // Se puebla en build() cuando soloConInventario == true
   Map<String, _Saldo> _saldoMap = {};
@@ -121,8 +122,9 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
   }
 
   Future<void> _submit(List<Cliente> clientes) async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_rangoObj == null || _clienteId == null) return;
+    if (_rangoObj == null) setState(() => _showRangoError = true);
+    if (!_formKey.currentState!.validate() || _rangoObj == null ||
+        _clienteId == null) return;
     final cliente = clientes.firstWhere((c) => c.id == _clienteId);
     final canastillas = _canastillas;
     final unidades = _esPaquetes
@@ -194,12 +196,13 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
               _clienteId = v;
               _rangoId = null;
               _rangoObj = null;
+              _showRangoError = false;
             }),
             validator: (v) => v == null ? 'Selecciona un cliente' : null,
           ),
           const SizedBox(height: 12),
 
-          // ── Tipo de menudencia (filtrado por inventario en despacho) ──────
+          // ── Chips de rango ────────────────────────────────────────────────
           if (_clienteId != null)
             StreamBuilder<List<Rango>>(
               stream: FirestoreService.instance.rangosStream(_clienteId!).map(
@@ -208,9 +211,16 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
                         .toList(),
                   ),
               builder: (ctx, snapshot) {
-                final allRangos = snapshot.data ?? [];
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    snapshot.data == null) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                  );
+                }
 
-                // Filtrar sólo rangos con stock cuando soloConInventario
+                final allRangos = snapshot.data ?? [];
                 final rangos = widget.soloConInventario
                     ? allRangos.where((r) {
                         final s = _saldoMap['$_clienteId|${r.id}'];
@@ -218,84 +228,101 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
                       }).toList()
                     : allRangos;
 
-                if (_rangoId != null && _rangoObj == null && rangos.isNotEmpty) {
+                // Resolver objeto rango cuando llega el stream (modo edición)
+                if (_rangoId != null && _rangoObj == null &&
+                    rangos.isNotEmpty) {
                   final found =
                       rangos.where((r) => r.id == _rangoId).firstOrNull;
                   if (found != null) {
-                    Future.microtask(() {
-                      if (mounted) setState(() => _rangoObj = found);
-                    });
+                    Future.microtask(
+                        () { if (mounted) setState(() => _rangoObj = found); });
                   }
                 }
 
-                final resolvedValue =
-                    rangos.any((r) => r.id == _rangoId) ? _rangoId : null;
+                if (rangos.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      widget.soloConInventario
+                          ? 'Sin menudencias con inventario disponible'
+                          : 'Sin tipos de menudencia configurados para este cliente',
+                      style: TextStyle(
+                          fontSize: 13, color: cs.onSurfaceVariant),
+                    ),
+                  );
+                }
 
-                return DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    labelText: 'Tipo de menudencia',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.restaurant),
-                    suffix:
-                        snapshot.connectionState == ConnectionState.waiting
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2))
-                            : null,
-                  ),
-                  // ignore: deprecated_member_use
-                  value: resolvedValue,
-                  items: rangos
-                      .map((r) => DropdownMenuItem(
-                            value: r.id,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  r.esPaquetes
-                                      ? Icons.inventory_2
-                                      : Icons.shopping_basket,
-                                  size: 16,
-                                  color: cs.onSurface,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(r.esPaquetes
-                                    ? '${r.nombre} (×${formatNum(r.multiplicador)} paq.)'
-                                    : r.nombre),
-                              ],
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Tipo de menudencia',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: rangos.map((r) {
+                        final selected = _rangoId == r.id;
+                        return ChoiceChip(
+                          avatar: Icon(
+                            r.esPaquetes
+                                ? Icons.inventory_2
+                                : Icons.shopping_basket,
+                            size: 16,
+                            color: selected
+                                ? cs.primary
+                                : cs.onSurfaceVariant,
+                          ),
+                          label: Text(
+                            r.esPaquetes
+                                ? '${r.nombre}  ×${formatNum(r.multiplicador)} paq.'
+                                : r.nombre,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: selected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    final sel = rangos.firstWhere((r) => r.id == v);
-                    setState(() {
-                      _rangoId = v;
-                      _rangoObj = sel;
-                    });
-                  },
-                  validator: (v) {
-                    if (_clienteId == null) {
-                      return 'Primero selecciona un cliente';
-                    }
-                    if (v == null) return 'Selecciona un tipo';
-                    return null;
-                  },
+                          ),
+                          selected: selected,
+                          selectedColor: cs.tertiaryContainer,
+                          checkmarkColor: cs.tertiary,
+                          onSelected: (_) => setState(() {
+                            _rangoId = r.id;
+                            _rangoObj = r;
+                            _showRangoError = false;
+                            if (widget.initialRangoId == null) {
+                              _canastillasCtrl.clear();
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    ),
+                    if (_showRangoError && _rangoObj == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 4),
+                        child: Text(
+                          'Selecciona un tipo de menudencia',
+                          style:
+                              TextStyle(color: cs.error, fontSize: 12),
+                        ),
+                      ),
+                  ],
                 );
               },
             )
           else
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Tipo de menudencia',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.restaurant),
-                hintText: 'Primero selecciona un cliente',
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(8),
               ),
-              items: const [],
-              onChanged: null,
-              validator: (_) =>
-                  _clienteId == null ? 'Primero selecciona un cliente' : null,
+              child: Text(
+                'Primero selecciona un cliente',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+              ),
             ),
           const SizedBox(height: 12),
 

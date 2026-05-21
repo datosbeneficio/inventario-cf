@@ -51,7 +51,6 @@ class EntradaForm extends StatefulWidget {
   State<EntradaForm> createState() => _EntradaFormState();
 }
 
-// Saldo disponible por (clienteId|rangoId)
 typedef _Saldo = ({int canastillas, int unidades, double peso});
 
 class _EntradaFormState extends State<EntradaForm> {
@@ -63,8 +62,8 @@ class _EntradaFormState extends State<EntradaForm> {
   final _pesoCtrl = TextEditingController();
   bool _esCola = false;
   bool _submitting = false;
+  bool _showRangoError = false;
 
-  // Se puebla en build() cuando soloConInventario == true
   Map<String, _Saldo> _saldoMap = {};
 
   int get _inputValue => int.tryParse(_inputCtrl.text) ?? 0;
@@ -127,8 +126,9 @@ class _EntradaFormState extends State<EntradaForm> {
   }
 
   Future<void> _submit(List<Cliente> clientes) async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_rangoObj == null || _clienteId == null) return;
+    if (_rangoObj == null) setState(() => _showRangoError = true);
+    if (!_formKey.currentState!.validate() || _rangoObj == null ||
+        _clienteId == null) return;
     final cliente = clientes.firstWhere((c) => c.id == _clienteId);
     setState(() => _submitting = true);
     await widget.onSubmit(
@@ -158,7 +158,6 @@ class _EntradaFormState extends State<EntradaForm> {
     final cs = Theme.of(context).colorScheme;
     final clientes = context.watch<List<Cliente>>();
 
-    // Computar saldos del ciclo activo (solo en modo despacho)
     if (widget.soloConInventario) {
       final ciclo = context.watch<CicloConfig>();
       final ingresos = context
@@ -196,21 +195,29 @@ class _EntradaFormState extends State<EntradaForm> {
               _clienteId = v;
               _rangoId = null;
               _rangoObj = null;
+              _showRangoError = false;
             }),
             validator: (v) => v == null ? 'Selecciona un cliente' : null,
           ),
           const SizedBox(height: 12),
 
-          // ── Rango (dinámico por cliente, filtrado por inventario) ─────────
+          // ── Chips de rango ────────────────────────────────────────────────
           if (_clienteId != null)
             StreamBuilder<List<Rango>>(
               stream: FirestoreService.instance.rangosStream(_clienteId!).map(
                     (rs) => rs.where((r) => r.tipo == kTipoAves).toList(),
                   ),
               builder: (ctx, snapshot) {
-                final allRangos = snapshot.data ?? [];
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    (snapshot.data == null)) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                  );
+                }
 
-                // Filtrar sólo rangos con stock cuando soloConInventario
+                final allRangos = snapshot.data ?? [];
                 final rangos = widget.soloConInventario
                     ? allRangos.where((r) {
                         final s = _saldoMap['$_clienteId|${r.id}'];
@@ -218,70 +225,91 @@ class _EntradaFormState extends State<EntradaForm> {
                       }).toList()
                     : allRangos;
 
-                // Resolver el objeto rango inicial cuando llega el stream
-                if (_rangoId != null && _rangoObj == null && rangos.isNotEmpty) {
+                // Resolver objeto rango cuando llega el stream (modo edición)
+                if (_rangoId != null && _rangoObj == null &&
+                    rangos.isNotEmpty) {
                   final found =
                       rangos.where((r) => r.id == _rangoId).firstOrNull;
                   if (found != null) {
-                    Future.microtask(() {
-                      if (mounted) setState(() => _rangoObj = found);
-                    });
+                    Future.microtask(
+                        () { if (mounted) setState(() => _rangoObj = found); });
                   }
                 }
 
-                final resolvedValue =
-                    rangos.any((r) => r.id == _rangoId) ? _rangoId : null;
+                if (rangos.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      widget.soloConInventario
+                          ? 'Sin rangos con inventario disponible'
+                          : 'Sin rangos configurados para este cliente',
+                      style: TextStyle(
+                          fontSize: 13, color: cs.onSurfaceVariant),
+                    ),
+                  );
+                }
 
-                return DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    labelText: 'Rango (aves)',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.category),
-                    suffix: snapshot.connectionState == ConnectionState.waiting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : null,
-                  ),
-                  // ignore: deprecated_member_use
-                  value: resolvedValue,
-                  items: rangos
-                      .map((r) => DropdownMenuItem(
-                            value: r.id,
-                            child: Text(
-                                '${r.nombre} (×${formatNum(r.multiplicador)})'),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    final sel = rangos.firstWhere((r) => r.id == v);
-                    setState(() {
-                      _rangoId = v;
-                      _rangoObj = sel;
-                    });
-                  },
-                  validator: (v) {
-                    if (_clienteId == null) {
-                      return 'Primero selecciona un cliente';
-                    }
-                    if (v == null) return 'Selecciona un rango';
-                    return null;
-                  },
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Rango (aves)',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: rangos.map((r) {
+                        final selected = _rangoId == r.id;
+                        return ChoiceChip(
+                          label: Text(
+                            '${r.nombre}  ×${formatNum(r.multiplicador)}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: selected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          selected: selected,
+                          selectedColor: cs.primaryContainer,
+                          checkmarkColor: cs.primary,
+                          onSelected: (_) => setState(() {
+                            _rangoId = r.id;
+                            _rangoObj = r;
+                            _showRangoError = false;
+                            if (widget.initialRangoId == null) {
+                              _inputCtrl.clear();
+                              _esCola = false;
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    ),
+                    if (_showRangoError && _rangoObj == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 4),
+                        child: Text(
+                          'Selecciona un rango',
+                          style:
+                              TextStyle(color: cs.error, fontSize: 12),
+                        ),
+                      ),
+                  ],
                 );
               },
             )
           else
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Rango (aves)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.category),
-                hintText: 'Primero selecciona un cliente',
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(8),
               ),
-              items: const [],
-              onChanged: null,
-              validator: (_) =>
-                  _clienteId == null ? 'Primero selecciona un cliente' : null,
+              child: Text(
+                'Primero selecciona un cliente',
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+              ),
             ),
           const SizedBox(height: 12),
 
