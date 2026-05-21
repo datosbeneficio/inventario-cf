@@ -806,7 +806,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                             subtitle: Text(
                               '${formatNum(l.canastillas)} canast. · '
                               '${formatNum(l.unidades)} unid. · '
-                              '${formatKg(l.peso)}',
+                              '${formatKg(l.peso)}'
+                              '${l.rangoTipo == kTipoAves && l.unidades > 0 ? '\nProm: ${formatPesoAve(l.peso, l.unidades)}' : ''}',
                               style: const TextStyle(fontSize: 11),
                             ),
                             trailing: IconButton(
@@ -974,7 +975,29 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       builder: (ctx) => _AgregarLineaDialog(
         clientes: clientes,
         saldoMap: saldoMap,
-        onAgregar: (linea) => setState(() => _lineas.add(linea)),
+        onAgregar: (linea) => setState(() {
+          // Acumular en la línea existente si coincide cliente + rango + esCola
+          final idx = _lineas.indexWhere((l) =>
+              l.clienteId == linea.clienteId &&
+              l.rangoId == linea.rangoId &&
+              l.esCola == linea.esCola);
+          if (idx >= 0) {
+            final e = _lineas[idx];
+            _lineas[idx] = DespachoLinea(
+              clienteId: e.clienteId,
+              clienteNombre: e.clienteNombre,
+              rangoId: e.rangoId,
+              rangoNombre: e.rangoNombre,
+              rangoTipo: e.rangoTipo,
+              canastillas: e.canastillas + linea.canastillas,
+              unidades: e.unidades + linea.unidades,
+              peso: e.peso + linea.peso,
+              esCola: e.esCola,
+            );
+          } else {
+            _lineas.add(linea);
+          }
+        }),
       ),
     );
   }

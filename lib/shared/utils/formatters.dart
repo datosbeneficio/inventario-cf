@@ -11,6 +11,12 @@ String formatDateTime(DateTime dt) => _dateTimeFormat.format(dt);
 String formatNum(num value) => _numberFormat.format(value);
 String formatKg(double value) => '${_numberFormat.format(value)} kg';
 
+/// Peso promedio por ave: "0.476 kg/ave". Devuelve "—" si unidades == 0.
+String formatPesoAve(double pesoKg, int unidades) {
+  if (unidades <= 0) return '—';
+  return '${(pesoKg / unidades).toStringAsFixed(3)} kg/ave';
+}
+
 bool isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 

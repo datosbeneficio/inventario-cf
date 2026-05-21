@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/despacho.dart';
 import '../../../shared/models/empresa_config.dart';
+import '../../../shared/utils/constants.dart';
 import '../../../shared/utils/formatters.dart';
 
 /// Construye el documento PDF de la guía de despacho.
@@ -192,7 +193,7 @@ pw.Widget _lineasTable(Despacho d) {
       1: pw.FlexColumnWidth(2),
       2: pw.FlexColumnWidth(1),
       3: pw.FlexColumnWidth(1),
-      4: pw.FlexColumnWidth(1),
+      4: pw.FlexColumnWidth(1.4),
     },
     children: [
       // Encabezado
@@ -203,17 +204,38 @@ pw.Widget _lineasTable(Despacho d) {
           _cell('RANGO', headerStyle),
           _cell('CANAST.', headerStyle),
           _cell('UNIDADES', headerStyle),
-          _cell('PESO (kg)', headerStyle),
+          _cell('PESO NETO', headerStyle),
         ],
       ),
       // Filas de datos
-      ...d.lineas.map((l) => pw.TableRow(children: [
-            _cell(l.clienteNombre, cellStyle),
-            _cell(l.rangoNombre, cellStyle),
-            _cell(formatNum(l.canastillas), cellStyle),
-            _cell(formatNum(l.unidades), cellStyle),
-            _cell(formatNum(l.peso), cellStyle),
-          ])),
+      ...d.lineas.map((l) {
+        final esAves = l.rangoTipo == kTipoAves && l.unidades > 0;
+        return pw.TableRow(children: [
+          _cell(l.clienteNombre, cellStyle),
+          _cell(l.rangoNombre, cellStyle),
+          _cell(formatNum(l.canastillas), cellStyle),
+          _cell(formatNum(l.unidades), cellStyle),
+          esAves
+              ? pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 4, vertical: 3),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(formatKg(l.peso), style: cellStyle),
+                      pw.Text(
+                        'Prom: ${formatPesoAve(l.peso, l.unidades)}',
+                        style: pw.TextStyle(
+                            fontSize: 7,
+                            fontStyle: pw.FontStyle.italic,
+                            color: PdfColors.grey600),
+                      ),
+                    ],
+                  ),
+                )
+              : _cell(formatKg(l.peso), cellStyle),
+        ]);
+      }),
       // Fila de totales
       pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey100),
@@ -222,7 +244,7 @@ pw.Widget _lineasTable(Despacho d) {
           _cell('', totalStyle),
           _cell(formatNum(d.totalCanastillas), totalStyle),
           _cell(formatNum(d.totalUnidades), totalStyle),
-          _cell(formatNum(d.totalPeso), totalStyle),
+          _cell(formatKg(d.totalPeso), totalStyle),
         ],
       ),
     ],

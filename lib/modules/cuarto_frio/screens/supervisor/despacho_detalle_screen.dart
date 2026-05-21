@@ -347,9 +347,9 @@ class _LineasCard extends StatelessWidget {
           columns: const [
             DataColumn(label: Text('Cliente')),
             DataColumn(label: Text('Rango')),
-            DataColumn(label: Text('Canastillas'), numeric: true),
+            DataColumn(label: Text('Canast.'), numeric: true),
             DataColumn(label: Text('Unidades'), numeric: true),
-            DataColumn(label: Text('Peso (kg)'), numeric: true),
+            DataColumn(label: Text('Peso neto'), numeric: true),
           ],
           rows: [
             ...d.lineas.map(
@@ -358,7 +358,24 @@ class _LineasCard extends StatelessWidget {
                 DataCell(Text(l.rangoNombre)),
                 DataCell(Text(formatNum(l.canastillas))),
                 DataCell(Text(formatNum(l.unidades))),
-                DataCell(Text(formatNum(l.peso))),
+                DataCell(
+                  l.rangoTipo == 'aves' && l.unidades > 0
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(formatKg(l.peso)),
+                            Text(
+                              formatPesoAve(l.peso, l.unidades),
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.black54,
+                                  fontStyle: FontStyle.italic),
+                            ),
+                          ],
+                        )
+                      : Text(formatKg(l.peso)),
+                ),
               ]),
             ),
             // Fila de totales
