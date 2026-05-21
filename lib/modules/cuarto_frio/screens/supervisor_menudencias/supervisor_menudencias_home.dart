@@ -8,6 +8,7 @@ import '../../widgets/menudencias_form.dart';
 import '../../../../shared/widgets/movimiento_tile.dart';
 import '../../widgets/inventario_panel.dart';
 import '../../../../shared/widgets/app_logo.dart';
+import '../../../../shared/widgets/calculadora_dialog.dart';
 import '../../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../../shared/utils/constants.dart';
 import '../../../../shared/utils/formatters.dart';
@@ -33,6 +34,11 @@ class _SupervisorMenudenciasHomeState
         title: Text(_titles[_tab]),
         actions: [
           const AppLogo(),
+          IconButton(
+            icon: const Icon(Icons.calculate_outlined),
+            tooltip: 'Calculadora',
+            onPressed: () => showCalculadora(context),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión',
