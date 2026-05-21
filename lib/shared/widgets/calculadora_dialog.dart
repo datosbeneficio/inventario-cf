@@ -24,6 +24,16 @@ class _CalculadoraDialogState extends State<_CalculadoraDialog> {
   bool _esperandoSegundo = false;
   bool _hayError = false;
 
+  /// Últimas operaciones (más reciente primero). Máx. 8.
+  final List<String> _historial = [];
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
   // ── Lógica ────────────────────────────────────────────────────────────────
 
   void _presionarDigito(String d) {
@@ -85,11 +95,25 @@ class _CalculadoraDialogState extends State<_CalculadoraDialog> {
       default:
         return;
     }
+    final entrada =
+        '${_formatear(_valor1!)} $_operador ${_formatear(v2)} = ${_formatear(resultado)}';
     setState(() {
       _display = _formatear(resultado);
+      _historial.insert(0, entrada);
+      if (_historial.length > 8) _historial.removeLast();
       _valor1 = null;
       _operador = null;
       _esperandoSegundo = false;
+    });
+    // Scroll al inicio (entrada más reciente)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -171,6 +195,39 @@ class _CalculadoraDialogState extends State<_CalculadoraDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // ── Historial de operaciones ──────────────────────────────
+            if (_historial.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxHeight: 88),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListView.builder(
+                  controller: _scrollCtrl,
+                  shrinkWrap: true,
+                  itemCount: _historial.length,
+                  itemBuilder: (_, i) => Text(
+                    _historial[i],
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: i == 0
+                          ? cs.onSurface
+                          : cs.onSurfaceVariant.withValues(alpha: 0.6),
+                      fontWeight: i == 0
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+
             // ── Display ──────────────────────────────────────────────
             Container(
               width: double.infinity,
