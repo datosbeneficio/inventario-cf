@@ -17,3 +17,15 @@ const String kSubtipoPaquetes = 'paquetes';
 /// Peso estándar de una canastilla vacía en kg.
 /// Se usa para calcular Peso Bruto = Peso Neto + (canastillas × kPesoCanastillaKg).
 const double kPesoCanastillaKg = 2.0;
+
+// ── Descartes de despacho ──────────────────────────────────────────────────────
+/// Siglas oficiales de descarte y su descripción completa.
+/// La clave 'OTRO' permite registrar causas no estándar.
+const Map<String, String> kDescartesSiglas = {
+  'HG': 'Hígado Friable',
+  'SC': 'Solicitud Cliente',
+  'PC': 'Pescuezo Comido',
+  'PP': 'Pérdida de Proceso',
+  'PD': 'Pododermatitis',
+  'OTRO': 'Otro',
+};

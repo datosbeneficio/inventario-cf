@@ -60,6 +60,9 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   // ── Líneas de producto ───────────────────────────────────────────────────
   final List<DespachoLinea> _lineas = [];
 
+  // ── Descartes ────────────────────────────────────────────────────────────
+  final List<DespachoDescarte> _descartes = [];
+
   // ── Estado de envío ──────────────────────────────────────────────────────
   bool _submitting = false;
   bool _despachado = false;
@@ -147,6 +150,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       _mostrarErrorVenc = false;
       _fotoBytes = null;
       _lineas.clear();
+      _descartes.clear();
       _submitting = false;
       _despachado = false;
       _ultimoDespacho = null;
@@ -302,6 +306,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         vencimientoMenudencias: _vencimientoMenudencias,
         observaciones: _obsCtrl.text.trim(),
         lineas: _lineas,
+        descartes: _descartes,
         timestamp: DateTime.now(),
       );
 
@@ -918,6 +923,66 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                     ),
                     const SizedBox(height: 24),
 
+                    // ── Sección 5: Descartes ────────────────────────────
+                    _SectionTitle(
+                        icon: Icons.report_problem_outlined,
+                        label: 'Descartes'),
+                    const SizedBox(height: 8),
+
+                    if (_descartes.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          'Sin descartes registrados (opcional).',
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    else
+                      ..._descartes.asMap().entries.map((e) {
+                        final idx = e.key;
+                        final d = e.value;
+                        return Card(
+                          child: ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              radius: 14,
+                              backgroundColor: cs.errorContainer,
+                              child: Text(
+                                d.sigla == 'OTRO' ? '?' : d.sigla,
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: cs.onErrorContainer),
+                              ),
+                            ),
+                            title: Text(
+                              d.tipo,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            subtitle: Text(
+                              '${formatNum(d.cantidad)} unid.',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Colors.red,
+                                  size: 20),
+                              onPressed: () => setState(
+                                  () => _descartes.removeAt(idx)),
+                            ),
+                          ),
+                        );
+                      }),
+
+                    OutlinedButton.icon(
+                      onPressed: () => _showAgregarDescarteDialog(context),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar descarte'),
+                    ),
+                    const SizedBox(height: 24),
+
                     // ── Botón confirmar ────────────────────────────────
                     FilledButton.icon(
                       onPressed:
@@ -944,6 +1009,18 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         ],
       ),
     );
+  }
+
+  // ── Dialog para agregar un descarte ──────────────────────────────────────
+
+  void _showAgregarDescarteDialog(BuildContext context) async {
+    final result = await showDialog<DespachoDescarte>(
+      context: context,
+      builder: (_) => const _AgregarDescarteDialog(),
+    );
+    if (result != null) {
+      setState(() => _descartes.add(result));
+    }
   }
 
   // ── Dialog para agregar una línea ─────────────────────────────────────────
@@ -1735,6 +1812,156 @@ class _DateField extends StatelessWidget {
               : null,
         ),
       ),
+    );
+  }
+}
+
+// ── Diálogo para agregar un descarte ─────────────────────────────────────────
+
+class _AgregarDescarteDialog extends StatefulWidget {
+  const _AgregarDescarteDialog();
+
+  @override
+  State<_AgregarDescarteDialog> createState() =>
+      _AgregarDescarteDialogState();
+}
+
+class _AgregarDescarteDialogState extends State<_AgregarDescarteDialog> {
+  String? _sigla;
+  final _otroCtrl = TextEditingController();
+  final _cantCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _otroCtrl.dispose();
+    _cantCtrl.dispose();
+    super.dispose();
+  }
+
+  void _confirmar() {
+    if (!_formKey.currentState!.validate()) { return; }
+    if (_sigla == null) { return; }
+    final tipo = _sigla == 'OTRO'
+        ? _otroCtrl.text.trim()
+        : kDescartesSiglas[_sigla]!;
+    Navigator.pop(
+      context,
+      DespachoDescarte(
+        sigla: _sigla!,
+        tipo: tipo,
+        cantidad: int.parse(_cantCtrl.text.trim()),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      icon: Icon(Icons.report_problem_outlined,
+          size: 36, color: cs.error),
+      title: const Text('Agregar descarte'),
+      content: Form(
+        key: _formKey,
+        child: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Chips de sigla ──────────────────────────────────────
+              Text('Motivo del descarte',
+                  style: TextStyle(
+                      fontSize: 12, color: cs.onSurfaceVariant)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: kDescartesSiglas.keys.map((sig) {
+                  final seleccionado = _sigla == sig;
+                  final label = sig == 'OTRO'
+                      ? 'Otro'
+                      : '$sig · ${kDescartesSiglas[sig]}';
+                  return ChoiceChip(
+                    label: Text(label,
+                        style: const TextStyle(fontSize: 12)),
+                    selected: seleccionado,
+                    onSelected: (_) =>
+                        setState(() => _sigla = sig),
+                    selectedColor: cs.errorContainer,
+                    labelStyle: seleccionado
+                        ? TextStyle(color: cs.onErrorContainer)
+                        : null,
+                  );
+                }).toList(),
+              ),
+              if (_sigla == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 2),
+                  child: Text('Selecciona un motivo',
+                      style: TextStyle(
+                          fontSize: 11, color: cs.error)),
+                ),
+
+              // ── Campo texto si sigla = OTRO ──────────────────────────
+              if (_sigla == 'OTRO') ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _otroCtrl,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción del descarte *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.edit_outlined),
+                  ),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty)
+                          ? 'Describe el motivo del descarte'
+                          : null,
+                ),
+              ],
+
+              const SizedBox(height: 12),
+
+              // ── Cantidad ─────────────────────────────────────────────
+              TextFormField(
+                controller: _cantCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Cantidad (unidades) *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.numbers_outlined),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Ingresa la cantidad';
+                  }
+                  final n = int.tryParse(v.trim());
+                  if (n == null || n <= 0) {
+                    return 'Debe ser un número mayor a 0';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _sigla == null ? null : _confirmar,
+          child: const Text('Agregar'),
+        ),
+      ],
     );
   }
 }

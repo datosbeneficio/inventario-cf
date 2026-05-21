@@ -176,7 +176,19 @@ class DespachoDetalleScreen extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             _LineasCard(d: despacho),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // ── Descartes ───────────────────────────────────────────────
+            if (despacho.descartes.isNotEmpty) ...[
+              Text('Descartes',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              _DescartesCard(d: despacho),
+              const SizedBox(height: 16),
+            ],
 
             // ── Firmas ──────────────────────────────────────────────────
             Row(
@@ -429,6 +441,74 @@ class _LineasCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Tabla de descartes ──────────────────────────────────────────────────────
+
+class _DescartesCard extends StatelessWidget {
+  final Despacho d;
+  const _DescartesCard({required this.d});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Table(
+        border: TableBorder.all(color: Colors.black26, width: 0.5),
+        columnWidths: const {
+          0: IntrinsicColumnWidth(),
+          1: FlexColumnWidth(),
+          2: IntrinsicColumnWidth(),
+        },
+        children: [
+          // Encabezado
+          TableRow(
+            decoration: BoxDecoration(color: cs.errorContainer),
+            children: [
+              _DCell('Sigla',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: cs.onErrorContainer)),
+              _DCell('Descripción',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: cs.onErrorContainer)),
+              _DCell('Cant.',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: cs.onErrorContainer)),
+            ],
+          ),
+          // Filas
+          ...d.descartes.map(
+            (e) => TableRow(children: [
+              _DCell(e.sigla,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              _DCell(e.tipo),
+              _DCell(formatNum(e.cantidad),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DCell extends StatelessWidget {
+  final String text;
+  final TextStyle? style;
+  const _DCell(this.text, {this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Text(text, style: style ?? const TextStyle(fontSize: 13)),
     );
   }
 }

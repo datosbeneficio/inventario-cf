@@ -1,6 +1,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../shared/utils/constants.dart';
 
+/// Un descarte registrado dentro del despacho.
+class DespachoDescarte {
+  /// Sigla del motivo: HG, SC, PC, PP, PD o OTRO.
+  final String sigla;
+  /// Descripción completa o texto libre (para OTRO).
+  final String tipo;
+  final int cantidad;
+
+  const DespachoDescarte({
+    required this.sigla,
+    required this.tipo,
+    required this.cantidad,
+  });
+
+  factory DespachoDescarte.fromMap(Map<String, dynamic> m) => DespachoDescarte(
+        sigla: m['sigla'] ?? '',
+        tipo: m['tipo'] ?? '',
+        cantidad: m['cantidad'] ?? 0,
+      );
+
+  Map<String, dynamic> toMap() => {
+        'sigla': sigla,
+        'tipo': tipo,
+        'cantidad': cantidad,
+      };
+}
+
 /// Una línea de producto dentro del despacho.
 class DespachoLinea {
   final String clienteId;
@@ -92,6 +119,8 @@ class Despacho {
   final String loteMenudencias;
   final DateTime? vencimientoMenudencias;
   final List<DespachoLinea> lineas;
+  /// Descartes registrados en este despacho (puede estar vacío).
+  final List<DespachoDescarte> descartes;
   final DateTime timestamp;
   final String? precintoFotoUrl;
   final String observaciones;
@@ -127,6 +156,7 @@ class Despacho {
     // Nota: en el formulario estos campos son obligatorios (INVIMA).
     // Los defaults vacíos/null solo aplican a documentos históricos.
     required this.lineas,
+    this.descartes = const [],
     required this.timestamp,
     this.precintoFotoUrl,
     this.observaciones = '',
@@ -173,6 +203,9 @@ class Despacho {
       lineas: lineasRaw
           .map((l) => DespachoLinea.fromMap(l as Map<String, dynamic>))
           .toList(),
+      descartes: (d['descartes'] as List<dynamic>? ?? [])
+          .map((e) => DespachoDescarte.fromMap(e as Map<String, dynamic>))
+          .toList(),
       timestamp: d['timestamp'] != null
           ? (d['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
@@ -210,6 +243,8 @@ class Despacho {
         if (vencimientoMenudencias != null)
           'vencimientoMenudencias': Timestamp.fromDate(vencimientoMenudencias!),
         'lineas': lineas.map((l) => l.toMap()).toList(),
+        if (descartes.isNotEmpty)
+          'descartes': descartes.map((d) => d.toMap()).toList(),
         'timestamp': FieldValue.serverTimestamp(),
         if (precintoFotoUrl != null) 'precintoFotoUrl': precintoFotoUrl,
         if (observaciones.isNotEmpty) 'observaciones': observaciones,

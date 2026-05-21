@@ -3,7 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../models/despacho.dart';
 import '../../../shared/models/empresa_config.dart';
-import '../../../shared/utils/constants.dart';
+import '../../../shared/utils/constants.dart'; // kDescartesSiglas, kTipoAves
 import '../../../shared/utils/formatters.dart';
 
 /// Construye el documento PDF de la guía de despacho.
@@ -34,6 +34,10 @@ Future<pw.Document> buildDespachoPdf(
           _infoGrid(d),
           pw.SizedBox(height: 10),
           _lineasTable(d),
+          if (d.descartes.isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            _descartesSection(d.descartes),
+          ],
           if (d.observaciones.isNotEmpty) ...[
             pw.SizedBox(height: 10),
             _observacionesSection(d.observaciones),
@@ -310,6 +314,53 @@ pw.Widget _precintoSection(pw.ImageProvider img) {
         child: pw.Center(
           child: pw.Image(img, fit: pw.BoxFit.contain),
         ),
+      ),
+    ],
+  );
+}
+
+// ── Descartes ───────────────────────────────────────────────────────────────
+
+pw.Widget _descartesSection(List<DespachoDescarte> descartes) {
+  final boldSm = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8);
+  final headerStyle =
+      pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8);
+  final cellStyle = const pw.TextStyle(fontSize: 8);
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Text('DESCARTES', style: boldSm),
+      pw.SizedBox(height: 3),
+      pw.Table(
+        border: pw.TableBorder.all(width: 0.5),
+        columnWidths: const {
+          0: pw.IntrinsicColumnWidth(),
+          1: pw.FlexColumnWidth(),
+          2: pw.IntrinsicColumnWidth(),
+        },
+        children: [
+          // Encabezado
+          pw.TableRow(
+            decoration:
+                const pw.BoxDecoration(color: PdfColors.red50),
+            children: [
+              _cell('SIGLA', headerStyle),
+              _cell('DESCRIPCIÓN', headerStyle),
+              _cell('CANT.', headerStyle),
+            ],
+          ),
+          // Filas
+          ...descartes.map(
+            (e) => pw.TableRow(children: [
+              _cell(e.sigla,
+                  pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold, fontSize: 8)),
+              _cell(e.tipo, cellStyle),
+              _cell(formatNum(e.cantidad), cellStyle),
+            ]),
+          ),
+        ],
       ),
     ],
   );
