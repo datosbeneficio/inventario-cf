@@ -848,6 +848,17 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       );
     }
 
+    // Restar líneas ya comprometidas en este despacho (aún no guardadas en Firestore)
+    for (final l in _lineas) {
+      final k = '${l.clienteId}|${l.rangoId}';
+      final p = saldoMap[k] ?? (canastillas: 0, unidades: 0, peso: 0.0);
+      saldoMap[k] = (
+        canastillas: p.canastillas - l.canastillas,
+        unidades:    p.unidades    - l.unidades,
+        peso:        p.peso        - l.peso,
+      );
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => _AgregarLineaDialog(
