@@ -6,6 +6,7 @@ import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_logo.dart';
 import '../../widgets/inventario_panel.dart';
 import 'despacho_detalle_screen.dart';
+import 'conductores_screen.dart';
 import 'destinos_screen.dart';
 import 'nuevo_despacho_screen.dart';
 import 'vehiculos_screen.dart';
@@ -193,7 +194,7 @@ class _GestionTabState extends State<_GestionTab>
   @override
   void initState() {
     super.initState();
-    _ctrl = TabController(length: 2, vsync: this);
+    _ctrl = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -210,9 +211,8 @@ class _GestionTabState extends State<_GestionTab>
           controller: _ctrl,
           tabs: const [
             Tab(icon: Icon(Icons.local_shipping_outlined), text: 'Vehículos'),
-            Tab(
-                icon: Icon(Icons.location_on_outlined),
-                text: 'Destinos'),
+            Tab(icon: Icon(Icons.person_outlined), text: 'Conductores'),
+            Tab(icon: Icon(Icons.location_on_outlined), text: 'Destinos'),
           ],
         ),
         Expanded(
@@ -220,6 +220,7 @@ class _GestionTabState extends State<_GestionTab>
             controller: _ctrl,
             children: const [
               VehiculosScreen(),
+              ConductoresScreen(),
               DestinosScreen(),
             ],
           ),

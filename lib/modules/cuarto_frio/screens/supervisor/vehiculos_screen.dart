@@ -33,10 +33,6 @@ class VehiculosScreen extends StatelessWidget {
   static void _showDialog(BuildContext context, Vehiculo? existing) {
     final placaCtrl =
         TextEditingController(text: existing?.placa ?? '');
-    final nombreCtrl =
-        TextEditingController(text: existing?.conductorNombre ?? '');
-    final cedulaCtrl =
-        TextEditingController(text: existing?.conductorCedula ?? '');
     final planchaCtrl =
         TextEditingController(text: existing?.plancha ?? '');
     final capacidadCtrl = TextEditingController(
@@ -63,30 +59,6 @@ class VehiculosScreen extends StatelessWidget {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.directions_car),
                     hintText: 'Ej: SSW 405',
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: nombreCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre del conductor',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: cedulaCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Cédula del conductor',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.badge),
                   ),
                   validator: (v) =>
                       (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
@@ -120,8 +92,7 @@ class VehiculosScreen extends StatelessWidget {
                   ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'Campo requerido';
-                    final n =
-                        double.tryParse(v.replaceAll(',', '.'));
+                    final n = double.tryParse(v.replaceAll(',', '.'));
                     if (n == null || n <= 0) return 'Valor inválido';
                     return null;
                   },
@@ -138,13 +109,11 @@ class VehiculosScreen extends StatelessWidget {
           FilledButton(
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
-              final cap = double.parse(
-                  capacidadCtrl.text.replaceAll(',', '.'));
+              final cap =
+                  double.parse(capacidadCtrl.text.replaceAll(',', '.'));
               if (existing == null) {
                 FirestoreService.instance.addVehiculo(
                   placa: placaCtrl.text,
-                  conductorNombre: nombreCtrl.text,
-                  conductorCedula: cedulaCtrl.text,
                   plancha: planchaCtrl.text,
                   capacidadKg: cap,
                 );
@@ -152,8 +121,6 @@ class VehiculosScreen extends StatelessWidget {
                 FirestoreService.instance.updateVehiculo(
                   existing.id,
                   placa: placaCtrl.text,
-                  conductorNombre: nombreCtrl.text,
-                  conductorCedula: cedulaCtrl.text,
                   plancha: planchaCtrl.text,
                   capacidadKg: cap,
                 );
@@ -185,27 +152,17 @@ class _VehiculoTile extends StatelessWidget {
         ),
         title: Text(v.placa,
             style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(v.conductorNombre),
-            Text(
-              'CC ${v.conductorCedula} · Plancha: ${v.plancha} · '
-              '${formatNum(v.capacidadKg)} kg',
-              style:
-                  TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-            ),
-          ],
+        subtitle: Text(
+          'Plancha: ${v.plancha} · ${formatNum(v.capacidadKg)} kg',
+          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
-        isThreeLine: true,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Editar',
-              onPressed: () =>
-                  VehiculosScreen._showDialog(context, v),
+              onPressed: () => VehiculosScreen._showDialog(context, v),
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),

@@ -5,6 +5,7 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../../../../shared/models/ciclo_config.dart';
 import '../../../../shared/models/cliente.dart';
+import '../../models/conductor.dart';
 import '../../models/despacho.dart';
 import '../../models/destino.dart';
 import '../../../../shared/models/empresa_config.dart';
@@ -30,6 +31,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 
   // ── Transporte ──────────────────────────────────────────────────────────
   Vehiculo? _vehiculo;
+  Conductor? _conductor;
   final _capacidadCtrl = TextEditingController();
   TimeOfDay _horaSalida = TimeOfDay.now();
 
@@ -113,6 +115,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   void _resetForm() {
     setState(() {
       _vehiculo = null;
+      _conductor = null;
       _destino = null;
       _fechaDespacho = DateTime.now();
       _fechaBeneficio = DateTime.now();
@@ -231,6 +234,10 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       _showError('Selecciona un vehículo');
       return;
     }
+    if (_conductor == null) {
+      _showError('Selecciona un conductor');
+      return;
+    }
     if (_destino == null) {
       _showError('Selecciona un destino');
       return;
@@ -251,9 +258,10 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         fechaBeneficio: _fechaBeneficio,
         vehiculoId: _vehiculo!.id,
         placa: _vehiculo!.placa,
-        conductorNombre: _vehiculo!.conductorNombre,
-        conductorCedula: _vehiculo!.conductorCedula,
         plancha: _vehiculo!.plancha,
+        conductorId: _conductor!.id,
+        conductorNombre: _conductor!.nombre,
+        conductorCedula: _conductor!.cedula,
         capacidadKg: double.parse(
             _capacidadCtrl.text.replaceAll(',', '.')),
         horaSalida: _horaSalidaStr,
@@ -304,6 +312,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final vehiculos = context.watch<List<Vehiculo>>();
+    final conductores = context.watch<List<Conductor>>();
     final destinos = context.watch<List<Destino>>();
 
     return SingleChildScrollView(
@@ -345,6 +354,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                         icon: Icons.local_shipping, label: 'Transporte'),
                     const SizedBox(height: 12),
 
+                    // ── Dropdown Vehículo ──────────────────────────────
                     DropdownButtonFormField<String>(
                       decoration: const InputDecoration(
                         labelText: 'Vehículo',
@@ -355,8 +365,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                       items: vehiculos
                           .map((v) => DropdownMenuItem(
                                 value: v.id,
-                                child: Text(
-                                    '${v.placa} — ${v.conductorNombre}'),
+                                child: Text(v.placa),
                               ))
                           .toList(),
                       onChanged: (id) {
@@ -376,13 +385,45 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                       const SizedBox(height: 8),
                       _InfoChip(children: [
                         _InfoRow(
-                            icon: Icons.badge,
-                            label: 'CC',
-                            value: _vehiculo!.conductorCedula),
-                        _InfoRow(
                             icon: Icons.grid_view,
                             label: 'Plancha',
                             value: _vehiculo!.plancha),
+                        _InfoRow(
+                            icon: Icons.scale,
+                            label: 'Capacidad',
+                            value: '${formatNum(_vehiculo!.capacidadKg)} kg'),
+                      ]),
+                    ],
+                    const SizedBox(height: 12),
+
+                    // ── Dropdown Conductor ─────────────────────────────
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Conductor',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                      initialValue: _conductor?.id,
+                      items: conductores
+                          .map((c) => DropdownMenuItem(
+                                value: c.id,
+                                child: Text(c.nombre),
+                              ))
+                          .toList(),
+                      onChanged: (id) => setState(() =>
+                          _conductor =
+                              conductores.firstWhere((c) => c.id == id)),
+                      validator: (v) =>
+                          v == null ? 'Selecciona un conductor' : null,
+                    ),
+
+                    if (_conductor != null) ...[
+                      const SizedBox(height: 8),
+                      _InfoChip(children: [
+                        _InfoRow(
+                            icon: Icons.badge,
+                            label: 'CC',
+                            value: _conductor!.cedula),
                       ]),
                     ],
                     const SizedBox(height: 12),

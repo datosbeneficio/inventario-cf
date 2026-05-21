@@ -66,9 +66,10 @@ class Despacho {
   final DateTime fechaBeneficio;
   final String vehiculoId;
   final String placa;
+  final String plancha;
+  final String conductorId;
   final String conductorNombre;
   final String conductorCedula;
-  final String plancha;
   final double capacidadKg;
   final String horaSalida;
   final String destinoId;
@@ -99,9 +100,10 @@ class Despacho {
     required this.fechaBeneficio,
     required this.vehiculoId,
     required this.placa,
+    required this.plancha,
+    this.conductorId = '',
     required this.conductorNombre,
     required this.conductorCedula,
-    required this.plancha,
     required this.capacidadKg,
     required this.horaSalida,
     required this.destinoId,
@@ -140,9 +142,10 @@ class Despacho {
           : DateTime.now(),
       vehiculoId: d['vehiculoId'] ?? '',
       placa: d['placa'] ?? '',
+      plancha: d['plancha'] ?? d['conductorCelular'] ?? '',
+      conductorId: d['conductorId'] ?? '',
       conductorNombre: d['conductorNombre'] ?? '',
       conductorCedula: d['conductorCedula'] ?? '',
-      plancha: d['plancha'] ?? d['conductorCelular'] ?? '',
       capacidadKg: (d['capacidadKg'] ?? 0.0).toDouble(),
       horaSalida: d['horaSalida'] ?? '',
       destinoId: d['destinoId'] ?? '',
@@ -180,9 +183,10 @@ class Despacho {
         'fechaBeneficio': Timestamp.fromDate(fechaBeneficio),
         'vehiculoId': vehiculoId,
         'placa': placa,
+        'plancha': plancha,
+        if (conductorId.isNotEmpty) 'conductorId': conductorId,
         'conductorNombre': conductorNombre,
         'conductorCedula': conductorCedula,
-        'plancha': plancha,
         'capacidadKg': capacidadKg,
         'horaSalida': horaSalida,
         'destinoId': destinoId,

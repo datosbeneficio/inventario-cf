@@ -6,6 +6,7 @@ import '../models/cliente.dart';
 import '../../modules/cuarto_frio/models/rango.dart';
 import '../../modules/cuarto_frio/models/ingreso.dart';
 import '../../modules/cuarto_frio/models/salida.dart';
+import '../../modules/cuarto_frio/models/conductor.dart';
 import '../../modules/cuarto_frio/models/vehiculo.dart';
 import '../../modules/cuarto_frio/models/destino.dart';
 import '../../modules/cuarto_frio/models/despacho.dart';
@@ -22,9 +23,10 @@ class FirestoreService {
   static const _colIngresos  = 'cf_ingresos';
   static const _colSalidas   = 'cf_salidas';
   static const _colDespachos = 'cf_despachos';
-  static const _colVehiculos = 'cf_vehiculos';
-  static const _colDestinos  = 'cf_destinos';
-  static const _colClientes  = 'clientes';   // compartido
+  static const _colVehiculos   = 'cf_vehiculos';
+  static const _colConductores = 'cf_conductores';
+  static const _colDestinos    = 'cf_destinos';
+  static const _colClientes    = 'clientes';   // compartido
 
   /// Nickname del usuario autenticado (parte antes del @ del email interno).
   /// Ejemplo: 'supervisor@avima.cf' → 'supervisor'
@@ -210,15 +212,11 @@ class FirestoreService {
 
   Future<void> addVehiculo({
     required String placa,
-    required String conductorNombre,
-    required String conductorCedula,
     required String plancha,
     required double capacidadKg,
   }) =>
       _db.collection(_colVehiculos).add({
         'placa': placa.toUpperCase().trim(),
-        'conductorNombre': conductorNombre.trim(),
-        'conductorCedula': conductorCedula.trim(),
         'plancha': plancha.trim(),
         'capacidadKg': capacidadKg,
         'activo': true,
@@ -228,18 +226,49 @@ class FirestoreService {
   Future<void> updateVehiculo(
     String id, {
     required String placa,
-    required String conductorNombre,
-    required String conductorCedula,
     required String plancha,
     required double capacidadKg,
   }) =>
       _db.collection(_colVehiculos).doc(id).update({
         'placa': placa.toUpperCase().trim(),
-        'conductorNombre': conductorNombre.trim(),
-        'conductorCedula': conductorCedula.trim(),
         'plancha': plancha.trim(),
         'capacidadKg': capacidadKg,
       });
+
+  // ── Conductores ──────────────────────────────────────────────────────────
+
+  Stream<List<Conductor>> conductoresStream() => _db
+      .collection(_colConductores)
+      .orderBy('nombre')
+      .snapshots()
+      .map((s) => s.docs
+          .map(Conductor.fromDoc)
+          .where((c) => c.activo)
+          .toList());
+
+  Future<void> addConductor({
+    required String nombre,
+    required String cedula,
+  }) =>
+      _db.collection(_colConductores).add({
+        'nombre': nombre.trim(),
+        'cedula': cedula.trim(),
+        'activo': true,
+        'creadoEn': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> updateConductor(
+    String id, {
+    required String nombre,
+    required String cedula,
+  }) =>
+      _db.collection(_colConductores).doc(id).update({
+        'nombre': nombre.trim(),
+        'cedula': cedula.trim(),
+      });
+
+  Future<void> deleteConductor(String id) =>
+      _db.collection(_colConductores).doc(id).update({'activo': false});
 
   Future<void> deleteVehiculo(String id) =>
       _db.collection(_colVehiculos).doc(id).update({'activo': false});

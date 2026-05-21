@@ -6,6 +6,7 @@ import 'shared/models/ciclo_config.dart';
 import 'shared/models/cliente.dart';
 import 'modules/cuarto_frio/models/ingreso.dart';
 import 'modules/cuarto_frio/models/salida.dart';
+import 'modules/cuarto_frio/models/conductor.dart';
 import 'modules/cuarto_frio/models/vehiculo.dart';
 import 'modules/cuarto_frio/models/destino.dart';
 import 'modules/cuarto_frio/models/despacho.dart';
@@ -35,6 +36,10 @@ void main() async {
         ),
         StreamProvider<List<Vehiculo>>(
           create: (_) => FirestoreService.instance.vehiculosStream(),
+          initialData: const [],
+        ),
+        StreamProvider<List<Conductor>>(
+          create: (_) => FirestoreService.instance.conductoresStream(),
           initialData: const [],
         ),
         StreamProvider<List<Destino>>(
