@@ -119,22 +119,27 @@ class FirestoreService {
     required int unidades,
     bool esRemanente = false,
     int bloqueNro = 1,
-  }) =>
-      _db.collection(_colIngresos).add({
-        'clienteId': clienteId,
-        'clienteNombre': clienteNombre,
-        'rangoId': rangoId,
-        'rangoNombre': rangoNombre,
-        'rangoTipo': rangoTipo,
-        'canastillas': canastillas,
-        'peso': peso,
-        'esCola': esCola,
-        'unidades': unidades,
-        'timestamp': FieldValue.serverTimestamp(),
-        if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
-        if (esRemanente) 'esRemanente': true,
-        'bloqueNro': bloqueNro,
-      });
+  }) {
+    // Fire-and-forget: con persistencia offline activa el dato queda en el
+    // caché local de forma inmediata y el stream lo refleja al instante.
+    // No hay que esperar el ACK del servidor para desbloquear el formulario.
+    _db.collection(_colIngresos).add({
+      'clienteId': clienteId,
+      'clienteNombre': clienteNombre,
+      'rangoId': rangoId,
+      'rangoNombre': rangoNombre,
+      'rangoTipo': rangoTipo,
+      'canastillas': canastillas,
+      'peso': peso,
+      'esCola': esCola,
+      'unidades': unidades,
+      'timestamp': FieldValue.serverTimestamp(),
+      if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
+      if (esRemanente) 'esRemanente': true,
+      'bloqueNro': bloqueNro,
+    });
+    return Future.value();
+  }
 
   Future<void> updateIngreso(
     String id, {
@@ -171,20 +176,23 @@ class FirestoreService {
     required double peso,
     required bool esCola,
     required int unidades,
-  }) =>
-      _db.collection(_colSalidas).add({
-        'clienteId': clienteId,
-        'clienteNombre': clienteNombre,
-        'rangoId': rangoId,
-        'rangoNombre': rangoNombre,
-        'rangoTipo': rangoTipo,
-        'canastillas': canastillas,
-        'peso': peso,
-        'esCola': esCola,
-        'unidades': unidades,
-        'timestamp': FieldValue.serverTimestamp(),
-        if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
-      });
+  }) {
+    // Fire-and-forget: mismo patron que addIngreso.
+    _db.collection(_colSalidas).add({
+      'clienteId': clienteId,
+      'clienteNombre': clienteNombre,
+      'rangoId': rangoId,
+      'rangoNombre': rangoNombre,
+      'rangoTipo': rangoTipo,
+      'canastillas': canastillas,
+      'peso': peso,
+      'esCola': esCola,
+      'unidades': unidades,
+      'timestamp': FieldValue.serverTimestamp(),
+      if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
+    });
+    return Future.value();
+  }
 
   Future<void> updateSalida(
     String id, {
