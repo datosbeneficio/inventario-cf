@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/ingreso.dart';
+import '../../../../shared/models/cliente.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/services/firestore_service.dart';
 import '../../widgets/consolidado_panel.dart';
 import '../../widgets/entrada_form.dart';
 import '../../widgets/inventario_panel.dart';
 import '../../widgets/historial_ingresos_panel.dart';
+import '../../../../shared/widgets/movimiento_tile.dart';
 import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/calculadora_dialog.dart';
 import '../../../../shared/widgets/connectivity_icon.dart';
+import '../../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../../shared/widgets/delete_guard_button.dart';
+import '../../../../shared/models/empresa_config.dart';
+import '../../../../shared/providers/delete_guard_provider.dart';
+import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/utils/constants.dart';
 
 class EncargadoHome extends StatefulWidget {
@@ -27,7 +33,7 @@ class _EncargadoHomeState extends State<EncargadoHome> {
   static const _titles = [
     'Inventario Aves',
     'Registrar Ingreso',
-    'Registros',
+    'Historial',
     'Consolidado',
   ];
 
@@ -89,17 +95,11 @@ class _EncargadoHomeState extends State<EncargadoHome> {
         index: _tab,
         children: [
           const InventarioPanel(soloTipo: kTipoAves),
-          // Tab Registrar: solo el formulario, sin lista al lado
-          _FormTab(
+          _IngresoAvesBody(
             bloqueActual: _bloqueActual,
             onNuevoBloque: _nuevoBloque,
           ),
-          // Tab Registros: historial + hoy, con edición y borrado protegido
-          const HistorialIngresosPanel(
-            rangoTipo: kTipoAves,
-            incluirHoy: true,
-            showEdit: true,
-          ),
+          const HistorialIngresosPanel(rangoTipo: kTipoAves),
           const ConsolidadoPanel(),
         ],
       ),
@@ -116,9 +116,8 @@ class _EncargadoHomeState extends State<EncargadoHome> {
               selectedIcon: Icon(Icons.add_box),
               label: 'Registrar'),
           NavigationDestination(
-              icon: Icon(Icons.list_alt_outlined),
-              selectedIcon: Icon(Icons.list_alt),
-              label: 'Registros'),
+              icon: Icon(Icons.history),
+              label: 'Historial'),
           NavigationDestination(
               icon: Icon(Icons.analytics_outlined),
               selectedIcon: Icon(Icons.analytics),
@@ -129,13 +128,60 @@ class _EncargadoHomeState extends State<EncargadoHome> {
   }
 }
 
-// ── Tab de registro: solo el formulario ──────────────────────────────────────
+// ── Pestaña de registro de ingreso de aves ────────────────────────────────────
 
-class _FormTab extends StatelessWidget {
+class _IngresoAvesBody extends StatelessWidget {
   final int bloqueActual;
   final VoidCallback onNuevoBloque;
 
-  const _FormTab({
+  const _IngresoAvesBody({
+    required this.bloqueActual,
+    required this.onNuevoBloque,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final todos = context.watch<List<Ingreso>>();
+    final hoy = DateTime.now();
+    final hoysIngresos = todos
+        .where((i) =>
+            i.rangoTipo == kTipoAves &&
+            i.timestamp.year == hoy.year &&
+            i.timestamp.month == hoy.month &&
+            i.timestamp.day == hoy.day)
+        .toList();
+
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        final form = _FormPanel(
+          bloqueActual: bloqueActual,
+          onNuevoBloque: onNuevoBloque,
+        );
+        final list = _ListaIngresos(ingresos: hoysIngresos);
+        if (constraints.maxWidth >= 700) {
+          return Row(children: [
+            SizedBox(width: 380, child: form),
+            const VerticalDivider(width: 1),
+            Expanded(child: list),
+          ]);
+        }
+        return Column(children: [
+          Expanded(flex: 3, child: form),
+          const Divider(),
+          Expanded(flex: 2, child: list),
+        ]);
+      },
+    );
+  }
+}
+
+// ── Formulario ────────────────────────────────────────────────────────────────
+
+class _FormPanel extends StatelessWidget {
+  final int bloqueActual;
+  final VoidCallback onNuevoBloque;
+
+  const _FormPanel({
     required this.bloqueActual,
     required this.onNuevoBloque,
   });
@@ -149,7 +195,6 @@ class _FormTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Indicador de bloque activo
           Row(
             children: [
               Chip(
@@ -208,6 +253,169 @@ class _FormTab extends StatelessWidget {
                   esCola, inputValue, multiplicador),
               bloqueNro: bloqueActual,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Lista de ingresos del día agrupada por bloque ─────────────────────────────
+
+class _ListaIngresos extends StatelessWidget {
+  final List<Ingreso> ingresos;
+  const _ListaIngresos({required this.ingresos});
+
+  @override
+  Widget build(BuildContext context) {
+    if (ingresos.isEmpty) {
+      return const Center(child: Text('Sin ingresos de aves hoy'));
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final deleteCodigoSet = context
+        .select<EmpresaConfig, bool>((e) => e.codigoEliminacion.isNotEmpty);
+    final deleteDesbloqueado =
+        context.select<DeleteGuardProvider, bool>((g) => g.isUnlocked);
+    final canDelete = !deleteCodigoSet || deleteDesbloqueado;
+
+    final totalUnid = ingresos.fold(0, (s, i) => s + i.unidades);
+    final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
+
+    final Map<int, List<Ingreso>> porBloque = {};
+    for (final i in ingresos) {
+      porBloque.putIfAbsent(i.bloqueNro, () => []).add(i);
+    }
+    final bloques = porBloque.keys.toList()..sort();
+
+    final List<Widget> items = [];
+
+    items.add(Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: Row(
+        children: [
+          Text('Ingresos de hoy (${ingresos.length})',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text('${formatNum(totalUnid)} unidades',
+                  style: const TextStyle(fontSize: 12)),
+              Text(formatKg(totalPeso),
+                  style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ],
+      ),
+    ));
+
+    for (final nro in bloques) {
+      final entries = porBloque[nro]!;
+      final bUnid = entries.fold(0, (s, i) => s + i.unidades);
+      final bPeso = entries.fold(0.0, (s, i) => s + i.peso);
+
+      items.add(Container(
+        color: cs.surfaceContainerLow,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        child: Row(
+          children: [
+            Icon(Icons.workspaces_outlined, size: 14, color: cs.primary),
+            const SizedBox(width: 6),
+            Text(
+              'Bloque $nro',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: cs.primary),
+            ),
+            const Spacer(),
+            Text(
+              '${formatNum(bUnid)} unid. · ${formatKg(bPeso)}',
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ));
+
+      for (final ingreso in entries) {
+        items.add(MovimientoTile(
+          rangoNombre: ingreso.rangoNombre,
+          clienteNombre: ingreso.clienteNombre.isNotEmpty
+              ? ingreso.clienteNombre
+              : null,
+          unidades: ingreso.unidades,
+          peso: ingreso.peso,
+          esCola: ingreso.esCola,
+          canastillas: ingreso.canastillas,
+          timestamp: ingreso.timestamp,
+          onEdit: () => _showEditDialog(context, ingreso),
+          onDelete: canDelete
+              ? () async {
+                  final ok = await showConfirmDelete(
+                      context,
+                      '${ingreso.rangoNombre} — '
+                      '${formatNum(ingreso.unidades)} unid.');
+                  if (ok) {
+                    FirestoreService.instance.deleteIngreso(ingreso.id);
+                  }
+                }
+              : null,
+        ));
+      }
+    }
+
+    items.add(const SizedBox(height: 16));
+    return ListView(children: items);
+  }
+
+  void _showEditDialog(BuildContext context, Ingreso ingreso) {
+    final clientes = context.read<List<Cliente>>();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar ingreso'),
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Provider<List<Cliente>>.value(
+              value: clientes,
+              child: EntradaForm(
+                submitLabel: 'Guardar cambios',
+                initialClienteId: ingreso.clienteId,
+                initialRangoId: ingreso.rangoId,
+                initialInputValue:
+                    ingreso.esCola ? ingreso.unidades : ingreso.canastillas,
+                initialPeso: ingreso.peso,
+                initialEsCola: ingreso.esCola,
+                onSubmit: ({
+                  required clienteId,
+                  required clienteNombre,
+                  required rangoId,
+                  required rangoNombre,
+                  required inputValue,
+                  required peso,
+                  required esCola,
+                  required multiplicador,
+                }) async {
+                  await FirestoreService.instance.updateIngreso(
+                    ingreso.id,
+                    canastillas: esCola ? 1 : inputValue,
+                    peso: peso,
+                    esCola: esCola,
+                    unidades: FirestoreService.calcularUnidades(
+                        esCola, inputValue, multiplicador),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
           ),
         ],
       ),
