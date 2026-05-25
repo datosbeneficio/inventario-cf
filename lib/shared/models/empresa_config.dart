@@ -26,6 +26,7 @@ class EmpresaConfig {
         direccion: '',
         nit: '',
         contacto: '',
+        codigoEliminacion: 'huevos',
       );
 
   factory EmpresaConfig.fromDoc(DocumentSnapshot doc) {
@@ -36,7 +37,7 @@ class EmpresaConfig {
       direccion: d['direccion'] ?? '',
       nit: d['nit'] ?? '',
       contacto: d['contacto'] ?? '',
-      codigoEliminacion: d['codigoEliminacion'] ?? '',
+      codigoEliminacion: d['codigoEliminacion'] ?? 'huevos',
     );
   }
 
