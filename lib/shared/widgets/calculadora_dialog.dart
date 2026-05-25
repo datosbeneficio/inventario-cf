@@ -60,40 +60,71 @@ class _CalculadoraDialogState extends State<_CalculadoraDialog> {
     });
   }
 
+  /// Calcula v1 op v2. Devuelve null si hay división por cero.
+  double? _calcular(double v1, String op, double v2) {
+    switch (op) {
+      case '+': return v1 + v2;
+      case '−': return v1 - v2;
+      case '×': return v1 * v2;
+      case '÷': return v2 == 0 ? null : v1 / v2;
+      default:  return null;
+    }
+  }
+
   void _presionarOperador(String op) {
+    bool scrollear = false;
     setState(() {
       _hayError = false;
-      _valor1 = _parsear(_display);
+      if (_operador != null && !_esperandoSegundo && _valor1 != null) {
+        // Cadena: ya había operación pendiente con segundo operando ingresado.
+        // Calcular el resultado parcial antes de iniciar la nueva operación.
+        final v2 = _parsear(_display);
+        final resultado = _calcular(_valor1!, _operador!, v2);
+        if (resultado == null) {
+          _display = 'Error';
+          _hayError = true;
+          _valor1 = null;
+          _operador = null;
+          _esperandoSegundo = false;
+          return;
+        }
+        _historial.insert(
+            0, '${_formatear(_valor1!)} $_operador ${_formatear(v2)} = ${_formatear(resultado)}');
+        if (_historial.length > 8) _historial.removeLast();
+        _valor1 = resultado;
+        _display = _formatear(resultado);
+        scrollear = true;
+      } else {
+        // Sin operación pendiente: tomar el display como primer operando.
+        _valor1 = _parsear(_display);
+      }
       _operador = op;
       _esperandoSegundo = true;
     });
+    if (scrollear) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollCtrl.hasClients) {
+          _scrollCtrl.animateTo(0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut);
+        }
+      });
+    }
   }
 
   void _presionarIgual() {
     if (_operador == null || _valor1 == null) return;
     final v2 = _parsear(_display);
-    double resultado;
-    switch (_operador) {
-      case '+':
-        resultado = _valor1! + v2;
-      case '−':
-        resultado = _valor1! - v2;
-      case '×':
-        resultado = _valor1! * v2;
-      case '÷':
-        if (v2 == 0) {
-          setState(() {
-            _display = 'Error';
-            _hayError = true;
-            _valor1 = null;
-            _operador = null;
-            _esperandoSegundo = false;
-          });
-          return;
-        }
-        resultado = _valor1! / v2;
-      default:
-        return;
+    final resultado = _calcular(_valor1!, _operador!, v2);
+    if (resultado == null) {
+      setState(() {
+        _display = 'Error';
+        _hayError = true;
+        _valor1 = null;
+        _operador = null;
+        _esperandoSegundo = false;
+      });
+      return;
     }
     final entrada =
         '${_formatear(_valor1!)} $_operador ${_formatear(v2)} = ${_formatear(resultado)}';
@@ -105,14 +136,11 @@ class _CalculadoraDialogState extends State<_CalculadoraDialog> {
       _operador = null;
       _esperandoSegundo = false;
     });
-    // Scroll al inicio (entrada más reciente)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          0,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
+        _scrollCtrl.animateTo(0,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut);
       }
     });
   }
