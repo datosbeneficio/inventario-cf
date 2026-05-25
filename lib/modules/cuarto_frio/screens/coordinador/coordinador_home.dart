@@ -5,6 +5,7 @@ import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/services/firestore_service.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_logo.dart';
+import '../../../../shared/widgets/connectivity_icon.dart';
 import '../../models/ingreso.dart';
 import '../../models/salida.dart';
 import '../../widgets/consolidado_panel.dart';
@@ -50,6 +51,7 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
       appBar: AppBar(
         title: Text(_tabs[_tab].title),
         actions: [
+          const ConnectivityIcon(),
           const AppLogo(),
           // ── Reiniciar inventario ────────────────────────────────────────
           IconButton(

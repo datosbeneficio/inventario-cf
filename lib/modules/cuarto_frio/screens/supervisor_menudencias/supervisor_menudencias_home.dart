@@ -10,6 +10,7 @@ import '../../widgets/historial_ingresos_panel.dart';
 import '../../../../shared/widgets/movimiento_tile.dart';
 import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/calculadora_dialog.dart';
+import '../../../../shared/widgets/connectivity_icon.dart';
 import '../../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../../shared/utils/constants.dart';
 import '../../../../shared/utils/formatters.dart';
@@ -74,6 +75,7 @@ class _SupervisorMenudenciasHomeState
       appBar: AppBar(
         title: Text(_titles[_tab]),
         actions: [
+          const ConnectivityIcon(),
           const AppLogo(),
           IconButton(
             icon: const Icon(Icons.calculate_outlined),

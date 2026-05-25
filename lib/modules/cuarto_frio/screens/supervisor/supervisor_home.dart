@@ -4,6 +4,7 @@ import '../../models/despacho.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_logo.dart';
+import '../../../../shared/widgets/connectivity_icon.dart';
 import '../../widgets/inventario_panel.dart';
 import 'despacho_detalle_screen.dart';
 import 'conductores_screen.dart';
@@ -34,6 +35,7 @@ class _SupervisorHomeState extends State<SupervisorHome> {
       appBar: AppBar(
         title: Text(_titles[_tab]),
         actions: [
+          const ConnectivityIcon(),
           const AppLogo(),
           IconButton(
             icon: const Icon(Icons.logout),
