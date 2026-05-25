@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/ingreso.dart';
+import '../../widgets/consolidado_panel.dart';
 import '../../../../shared/models/cliente.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/services/firestore_service.dart';
@@ -12,6 +13,9 @@ import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/calculadora_dialog.dart';
 import '../../../../shared/widgets/connectivity_icon.dart';
 import '../../../../shared/widgets/confirm_delete_dialog.dart';
+import '../../../../shared/widgets/delete_guard_button.dart';
+import '../../../../shared/models/empresa_config.dart';
+import '../../../../shared/providers/delete_guard_provider.dart';
 import '../../../../shared/utils/constants.dart';
 import '../../../../shared/utils/formatters.dart';
 
@@ -32,6 +36,7 @@ class _SupervisorMenudenciasHomeState
     'Inventario Menudencias',
     'Registrar Ingreso',
     'Historial',
+    'Consolidado',
   ];
 
   @override
@@ -77,6 +82,7 @@ class _SupervisorMenudenciasHomeState
         actions: [
           const ConnectivityIcon(),
           const AppLogo(),
+          const DeleteGuardButton(),
           IconButton(
             icon: const Icon(Icons.calculate_outlined),
             tooltip: 'Calculadora',
@@ -98,6 +104,7 @@ class _SupervisorMenudenciasHomeState
             onNuevoBloque: _nuevoBloque,
           ),
           const HistorialIngresosPanel(rangoTipo: kTipoMenudencias),
+          const ConsolidadoPanel(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -110,6 +117,10 @@ class _SupervisorMenudenciasHomeState
               icon: Icon(Icons.add_box), label: 'Registrar'),
           NavigationDestination(
               icon: Icon(Icons.history), label: 'Historial'),
+          NavigationDestination(
+              icon: Icon(Icons.analytics_outlined),
+              selectedIcon: Icon(Icons.analytics),
+              label: 'Consolidado'),
         ],
       ),
     );
@@ -261,6 +272,12 @@ class _ListaIngresos extends StatelessWidget {
     }
 
     final cs = Theme.of(context).colorScheme;
+    final deleteCodigoSet = context
+        .select<EmpresaConfig, bool>((e) => e.codigoEliminacion.isNotEmpty);
+    final deleteDesbloqueado =
+        context.select<DeleteGuardProvider, bool>((g) => g.isUnlocked);
+    final canDelete = !deleteCodigoSet || deleteDesbloqueado;
+
     final totalCan = ingresos.fold(0, (s, i) => s + i.canastillas);
     final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
 
@@ -338,15 +355,17 @@ class _ListaIngresos extends StatelessWidget {
           canastillas: ingreso.canastillas,
           timestamp: ingreso.timestamp,
           onEdit: () => _showEditDialog(context, ingreso),
-          onDelete: () async {
-            final ok = await showConfirmDelete(
-                context,
-                '${ingreso.rangoNombre} — '
-                '${formatNum(ingreso.canastillas)} canastillas');
-            if (ok) {
-              FirestoreService.instance.deleteIngreso(ingreso.id);
-            }
-          },
+          onDelete: canDelete
+              ? () async {
+                  final ok = await showConfirmDelete(
+                      context,
+                      '${ingreso.rangoNombre} — '
+                      '${formatNum(ingreso.canastillas)} canastillas');
+                  if (ok) {
+                    FirestoreService.instance.deleteIngreso(ingreso.id);
+                  }
+                }
+              : null,
         ));
       }
     }

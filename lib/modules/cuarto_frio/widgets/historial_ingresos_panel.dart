@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/ingreso.dart';
+import '../../../shared/models/empresa_config.dart';
+import '../../../shared/providers/delete_guard_provider.dart';
+import '../../../shared/services/firestore_service.dart';
 import '../../../shared/utils/constants.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../shared/widgets/movimiento_tile.dart';
 
 /// Panel de historial de ingresos agrupados por día y bloque.
@@ -350,6 +354,13 @@ class _BloqueSeccion extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
+    // Guard de eliminación para registros históricos
+    final deleteCodigoSet = context
+        .select<EmpresaConfig, bool>((e) => e.codigoEliminacion.isNotEmpty);
+    final deleteDesbloqueado =
+        context.select<DeleteGuardProvider, bool>((g) => g.isUnlocked);
+    final canDelete = !deleteCodigoSet || deleteDesbloqueado;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -380,7 +391,7 @@ class _BloqueSeccion extends StatelessWidget {
             ],
           ),
         ),
-        // Entradas del bloque (solo lectura — sin botones de accion)
+        // Entradas del bloque
         ...items.map(
           (i) => MovimientoTile(
             rangoNombre: i.rangoNombre,
@@ -391,6 +402,17 @@ class _BloqueSeccion extends StatelessWidget {
             esCola: i.esCola,
             canastillas: i.canastillas,
             timestamp: i.timestamp,
+            onDelete: canDelete
+                ? () async {
+                    final label = esAves
+                        ? '${i.rangoNombre} — ${formatNum(i.unidades)} unid.'
+                        : '${i.rangoNombre} — ${formatNum(i.canastillas)} canastillas';
+                    final ok = await showConfirmDelete(context, label);
+                    if (ok) {
+                      FirestoreService.instance.deleteIngreso(i.id);
+                    }
+                  }
+                : null,
           ),
         ),
       ],

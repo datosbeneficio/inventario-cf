@@ -17,7 +17,9 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
   late final TextEditingController _direccionCtrl;
   late final TextEditingController _nitCtrl;
   late final TextEditingController _contactoCtrl;
+  late final TextEditingController _codigoCtrl;
   bool _saving = false;
+  bool _obscureCodigo = true;
 
   @override
   void initState() {
@@ -28,6 +30,7 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
     _direccionCtrl = TextEditingController(text: cfg.direccion);
     _nitCtrl = TextEditingController(text: cfg.nit);
     _contactoCtrl = TextEditingController(text: cfg.contacto);
+    _codigoCtrl = TextEditingController(text: cfg.codigoEliminacion);
   }
 
   @override
@@ -37,6 +40,7 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
     _direccionCtrl.dispose();
     _nitCtrl.dispose();
     _contactoCtrl.dispose();
+    _codigoCtrl.dispose();
     super.dispose();
   }
 
@@ -50,6 +54,7 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
         direccion: _direccionCtrl.text.trim(),
         nit: _nitCtrl.text.trim(),
         contacto: _contactoCtrl.text.trim(),
+        codigoEliminacion: _codigoCtrl.text.trim(),
       ),
     );
     if (mounted) {
@@ -149,6 +154,40 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.phone_outlined),
                   hintText: 'Ej: 314 456 7890',
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 12),
+              const Text(
+                'Seguridad de eliminación',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Código que los supervisores deben ingresar para poder eliminar registros. '
+                'Déjalo vacío para desactivar el bloqueo.',
+                style: TextStyle(color: Colors.black54, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              StatefulBuilder(
+                builder: (_, setLocal) => TextFormField(
+                  controller: _codigoCtrl,
+                  obscureText: _obscureCodigo,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Código de eliminación (opcional)',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    hintText: 'Ej: 1234',
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureCodigo
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                      onPressed: () =>
+                          setLocal(() => _obscureCodigo = !_obscureCodigo),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 28),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'shared/providers/connectivity_provider.dart';
+import 'shared/providers/delete_guard_provider.dart';
 import 'shared/models/ciclo_config.dart';
 import 'shared/models/cliente.dart';
 import 'modules/cuarto_frio/models/ingreso.dart';
@@ -33,6 +34,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
+        ChangeNotifierProvider(create: (_) => DeleteGuardProvider()),
         StreamProvider<List<Cliente>>(
           create: (_) => FirestoreService.instance.clientesStream(),
           initialData: const [],

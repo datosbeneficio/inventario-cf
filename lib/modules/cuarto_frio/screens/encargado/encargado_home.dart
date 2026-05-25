@@ -4,6 +4,7 @@ import '../../models/ingreso.dart';
 import '../../../../shared/models/cliente.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/services/firestore_service.dart';
+import '../../widgets/consolidado_panel.dart';
 import '../../widgets/entrada_form.dart';
 import '../../widgets/inventario_panel.dart';
 import '../../widgets/historial_ingresos_panel.dart';
@@ -12,6 +13,9 @@ import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/calculadora_dialog.dart';
 import '../../../../shared/widgets/connectivity_icon.dart';
 import '../../../../shared/widgets/confirm_delete_dialog.dart';
+import '../../../../shared/widgets/delete_guard_button.dart';
+import '../../../../shared/models/empresa_config.dart';
+import '../../../../shared/providers/delete_guard_provider.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/utils/constants.dart';
 
@@ -30,6 +34,7 @@ class _EncargadoHomeState extends State<EncargadoHome> {
     'Inventario Aves',
     'Registrar Ingreso',
     'Historial',
+    'Consolidado',
   ];
 
   @override
@@ -75,6 +80,7 @@ class _EncargadoHomeState extends State<EncargadoHome> {
         actions: [
           const ConnectivityIcon(),
           const AppLogo(),
+          const DeleteGuardButton(),
           IconButton(
             icon: const Icon(Icons.calculate_outlined),
             tooltip: 'Calculadora',
@@ -96,6 +102,7 @@ class _EncargadoHomeState extends State<EncargadoHome> {
             onNuevoBloque: _nuevoBloque,
           ),
           const HistorialIngresosPanel(rangoTipo: kTipoAves),
+          const ConsolidadoPanel(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -108,6 +115,10 @@ class _EncargadoHomeState extends State<EncargadoHome> {
               icon: Icon(Icons.add_box), label: 'Registrar'),
           NavigationDestination(
               icon: Icon(Icons.history), label: 'Historial'),
+          NavigationDestination(
+              icon: Icon(Icons.analytics_outlined),
+              selectedIcon: Icon(Icons.analytics),
+              label: 'Consolidado'),
         ],
       ),
     );
@@ -261,6 +272,14 @@ class _ListaIngresos extends StatelessWidget {
     }
 
     final cs = Theme.of(context).colorScheme;
+    // Guard de eliminación: activo solo si no hay código configurado (retrocompat)
+    // o si el DeleteGuardProvider está desbloqueado.
+    final deleteCodigoSet = context
+        .select<EmpresaConfig, bool>((e) => e.codigoEliminacion.isNotEmpty);
+    final deleteDesbloqueado =
+        context.select<DeleteGuardProvider, bool>((g) => g.isUnlocked);
+    final canDelete = !deleteCodigoSet || deleteDesbloqueado;
+
     final totalUnid = ingresos.fold(0, (s, i) => s + i.unidades);
     final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
 
@@ -338,15 +357,17 @@ class _ListaIngresos extends StatelessWidget {
           canastillas: ingreso.canastillas,
           timestamp: ingreso.timestamp,
           onEdit: () => _showEditDialog(context, ingreso),
-          onDelete: () async {
-            final ok = await showConfirmDelete(
-                context,
-                '${ingreso.rangoNombre} — '
-                '${formatNum(ingreso.unidades)} unid.');
-            if (ok) {
-              FirestoreService.instance.deleteIngreso(ingreso.id);
-            }
-          },
+          onDelete: canDelete
+              ? () async {
+                  final ok = await showConfirmDelete(
+                      context,
+                      '${ingreso.rangoNombre} — '
+                      '${formatNum(ingreso.unidades)} unid.');
+                  if (ok) {
+                    FirestoreService.instance.deleteIngreso(ingreso.id);
+                  }
+                }
+              : null,
         ));
       }
     }

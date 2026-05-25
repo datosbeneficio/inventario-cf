@@ -7,12 +7,17 @@ class EmpresaConfig {
   final String nit;
   final String contacto;
 
+  /// Código numérico para desbloquear la eliminación de registros.
+  /// Si está vacío, el botón de guard no se muestra (feature desactivada).
+  final String codigoEliminacion;
+
   const EmpresaConfig({
     required this.nombre,
     required this.subtitulo,
     required this.direccion,
     required this.nit,
     required this.contacto,
+    this.codigoEliminacion = '',
   });
 
   factory EmpresaConfig.empty() => const EmpresaConfig(
@@ -31,6 +36,7 @@ class EmpresaConfig {
       direccion: d['direccion'] ?? '',
       nit: d['nit'] ?? '',
       contacto: d['contacto'] ?? '',
+      codigoEliminacion: d['codigoEliminacion'] ?? '',
     );
   }
 
@@ -40,5 +46,6 @@ class EmpresaConfig {
         'direccion': direccion.trim(),
         'nit': nit.trim(),
         'contacto': contacto.trim(),
+        'codigoEliminacion': codigoEliminacion.trim(),
       };
 }

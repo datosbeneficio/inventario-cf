@@ -64,6 +64,12 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
   // Se puebla en build() cuando soloConInventario == true
   Map<String, _Saldo> _saldoMap = {};
 
+  /// En modo edición el rango llega asíncrono; bloqueamos submit mientras tanto.
+  bool get _loadingRango =>
+      widget.initialRangoId != null && _clienteId != null && _rangoObj == null;
+
+  bool get _submitEnabled => !_submitting && !_loadingRango;
+
   bool get _esPaquetes => _rangoObj?.esPaquetes ?? false;
   int get _canastillas => int.tryParse(_canastillasCtrl.text) ?? 0;
   int get _preview => _esPaquetes
@@ -432,14 +438,14 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
           const SizedBox(height: 16),
 
           FilledButton.icon(
-            onPressed: _submitting ? null : () => _submit(clientes),
+            onPressed: _submitEnabled ? () => _submit(clientes) : null,
             icon: _submitting
                 ? const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.save),
-            label: Text(widget.submitLabel),
+            label: Text(_loadingRango ? 'Cargando rango...' : widget.submitLabel),
             style: FilledButton.styleFrom(
               backgroundColor: cs.tertiary,
               foregroundColor: cs.onTertiary,

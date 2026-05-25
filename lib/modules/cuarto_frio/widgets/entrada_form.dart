@@ -66,6 +66,14 @@ class _EntradaFormState extends State<EntradaForm> {
 
   Map<String, _Saldo> _saldoMap = {};
 
+  /// En modo edición, el rango se resuelve de forma asíncrona desde el stream.
+  /// Bloqueamos el submit mientras no esté disponible para evitar el bug de
+  /// validación silenciosa.
+  bool get _loadingRango =>
+      widget.initialRangoId != null && _clienteId != null && _rangoObj == null;
+
+  bool get _submitEnabled => !_submitting && !_loadingRango;
+
   int get _inputValue => int.tryParse(_inputCtrl.text) ?? 0;
 
   int get _preview {
@@ -438,14 +446,16 @@ class _EntradaFormState extends State<EntradaForm> {
           const SizedBox(height: 16),
 
           FilledButton.icon(
-            onPressed: _submitting ? null : () => _submit(clientes),
+            onPressed: _submitEnabled ? () => _submit(clientes) : null,
             icon: _submitting
                 ? const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.save),
-            label: Text(widget.submitLabel),
+            label: Text(_loadingRango
+                ? 'Cargando rango...'
+                : widget.submitLabel),
           ),
         ],
       ),
