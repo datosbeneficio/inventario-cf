@@ -262,13 +262,20 @@ class _FormPanel extends StatelessWidget {
 
 // ── Lista de ingresos del día agrupada por bloque ─────────────────────────────
 
-class _ListaIngresos extends StatelessWidget {
+class _ListaIngresos extends StatefulWidget {
   final List<Ingreso> ingresos;
   const _ListaIngresos({required this.ingresos});
 
   @override
+  State<_ListaIngresos> createState() => _ListaIngresosState();
+}
+
+class _ListaIngresosState extends State<_ListaIngresos> {
+  String? _clienteFiltro;
+
+  @override
   Widget build(BuildContext context) {
-    if (ingresos.isEmpty) {
+    if (widget.ingresos.isEmpty) {
       return const Center(child: Text('Sin ingresos de menudencias hoy'));
     }
 
@@ -278,6 +285,23 @@ class _ListaIngresos extends StatelessWidget {
     final deleteDesbloqueado =
         context.select<DeleteGuardProvider, bool>((g) => g.isUnlocked);
     final canDelete = !deleteCodigoSet || deleteDesbloqueado;
+
+    // Clientes únicos del día
+    final clientesMap = <String, String>{};
+    for (final i in widget.ingresos) {
+      if (i.clienteId.isNotEmpty) clientesMap[i.clienteId] = i.clienteNombre;
+    }
+    final clientesOrdenados = clientesMap.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+
+    // Reset filtro si el cliente ya no aparece
+    if (_clienteFiltro != null && !clientesMap.containsKey(_clienteFiltro)) {
+      Future.microtask(() => setState(() => _clienteFiltro = null));
+    }
+
+    final ingresos = _clienteFiltro == null
+        ? widget.ingresos
+        : widget.ingresos.where((i) => i.clienteId == _clienteFiltro).toList();
 
     final totalCan = ingresos.fold(0, (s, i) => s + i.canastillas);
     final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
@@ -289,6 +313,65 @@ class _ListaIngresos extends StatelessWidget {
     final bloques = porBloque.keys.toList()..sort();
 
     final List<Widget> items = [];
+
+    // Chips de filtro por cliente (solo si hay más de uno)
+    if (clientesOrdenados.length > 1) {
+      items.add(Container(
+        color: cs.surfaceContainerLowest,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: FilterChip(
+                  label: const Text('Todos'),
+                  selected: _clienteFiltro == null,
+                  onSelected: (_) => setState(() => _clienteFiltro = null),
+                  selectedColor: cs.tertiaryContainer,
+                  checkmarkColor: cs.onTertiaryContainer,
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    color: _clienteFiltro == null ? cs.onTertiaryContainer : null,
+                    fontWeight: _clienteFiltro == null ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  side: BorderSide(
+                    color: _clienteFiltro == null ? cs.tertiary : cs.outlineVariant,
+                    width: _clienteFiltro == null ? 1.5 : 1,
+                  ),
+                  showCheckmark: _clienteFiltro == null,
+                ),
+              ),
+              ...clientesOrdenados.map((entry) {
+                final sel = _clienteFiltro == entry.key;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    label: Text(entry.value),
+                    selected: sel,
+                    onSelected: (_) => setState(
+                        () => _clienteFiltro = sel ? null : entry.key),
+                    selectedColor: cs.tertiaryContainer,
+                    checkmarkColor: cs.onTertiaryContainer,
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      color: sel ? cs.onTertiaryContainer : null,
+                      fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    side: BorderSide(
+                      color: sel ? cs.tertiary : cs.outlineVariant,
+                      width: sel ? 1.5 : 1,
+                    ),
+                    showCheckmark: sel,
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ));
+    }
 
     items.add(Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
