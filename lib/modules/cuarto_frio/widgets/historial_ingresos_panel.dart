@@ -14,11 +14,11 @@ import 'menudencias_form.dart';
 
 /// Panel de registros de ingresos agrupados por día y bloque.
 ///
-/// [incluirHoy] — cuando true, incluye los registros del día actual
-///   (útil en el tab "Registros" que reemplaza al antiguo Historial).
-///   Cuando false (por defecto) solo muestra días anteriores.
+/// [incluirHoy] — cuando true, muestra los registros del día actual en una
+///   sección siempre visible en la parte superior, más los días anteriores
+///   como secciones colapsables.
 ///
-/// [showEdit] — cuando true, muestra el botón de edición en cada tile.
+/// [showEdit] — cuando true, cada tile muestra el botón de edición.
 class HistorialIngresosPanel extends StatefulWidget {
   final String rangoTipo;
   final bool incluirHoy;
@@ -38,24 +38,23 @@ class HistorialIngresosPanel extends StatefulWidget {
 class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
   String? _clienteIdFiltro;
 
+  static String _claveDia(DateTime dt) =>
+      '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+
+  static bool _esHoy(DateTime dt) {
+    final hoy = DateTime.now();
+    return dt.year == hoy.year && dt.month == hoy.month && dt.day == hoy.day;
+  }
+
   @override
   Widget build(BuildContext context) {
     final todos = context.watch<List<Ingreso>>();
-    final hoy = DateTime.now();
 
-    final registros = todos.where((i) {
-      if (i.rangoTipo != widget.rangoTipo) return false;
-      if (!widget.incluirHoy) {
-        final t = i.timestamp;
-        final esHoy = t.year == hoy.year &&
-            t.month == hoy.month &&
-            t.day == hoy.day;
-        if (esHoy) return false;
-      }
-      return true;
-    }).toList();
+    // Filtrar por tipo
+    final porTipo =
+        todos.where((i) => i.rangoTipo == widget.rangoTipo).toList();
 
-    if (registros.isEmpty) {
+    if (porTipo.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -65,9 +64,7 @@ class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
                 color: Theme.of(context).colorScheme.outlineVariant),
             const SizedBox(height: 12),
             Text(
-              widget.incluirHoy
-                  ? 'Sin registros aún'
-                  : 'Sin historial de días anteriores',
+              widget.incluirHoy ? 'Sin registros aún' : 'Sin historial de días anteriores',
               style: const TextStyle(color: Colors.grey),
             ),
           ],
@@ -75,31 +72,42 @@ class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
       );
     }
 
-    // Clientes únicos (orden alfabético)
+    // Separar hoy de días anteriores
+    final hoy = porTipo.where((i) => _esHoy(i.timestamp)).toList();
+    final anteriores = porTipo.where((i) => !_esHoy(i.timestamp)).toList();
+
+    // Clientes únicos para filtros (union de hoy + anteriores)
     final clientesMap = <String, String>{};
-    for (final i in registros) {
+    for (final i in porTipo) {
       if (i.clienteId.isNotEmpty) clientesMap[i.clienteId] = i.clienteNombre;
     }
     final clientes = clientesMap.entries.toList()
       ..sort((a, b) => a.value.compareTo(b.value));
 
-    if (_clienteIdFiltro != null && !clientesMap.containsKey(_clienteIdFiltro)) {
-      _clienteIdFiltro = null;
+    // Reset filtro si el cliente ya no existe
+    if (_clienteIdFiltro != null &&
+        !clientesMap.containsKey(_clienteIdFiltro)) {
+      Future.microtask(() => setState(() => _clienteIdFiltro = null));
     }
 
-    final filtrados = _clienteIdFiltro == null
-        ? registros
-        : registros.where((i) => i.clienteId == _clienteIdFiltro).toList();
+    // Aplicar filtro de cliente
+    final hoyFiltrado = _clienteIdFiltro == null
+        ? hoy
+        : hoy.where((i) => i.clienteId == _clienteIdFiltro).toList();
+    final anterioresFiltrados = _clienteIdFiltro == null
+        ? anteriores
+        : anteriores.where((i) => i.clienteId == _clienteIdFiltro).toList();
 
-    // Agrupar por día
+    // Agrupar días anteriores
     final Map<String, List<Ingreso>> porDia = {};
-    for (final i in filtrados) {
+    for (final i in anterioresFiltrados) {
       porDia.putIfAbsent(_claveDia(i.timestamp), () => []).add(i);
     }
     final diasOrdenados = porDia.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return Column(
       children: [
+        // Barra de filtros por cliente
         if (clientes.length > 1)
           _FiltroClientes(
             clientes: clientes,
@@ -107,144 +115,210 @@ class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
             onSeleccionado: (id) => setState(() => _clienteIdFiltro = id),
             esAves: widget.rangoTipo == kTipoAves,
           ),
+
         Expanded(
-          child: filtrados.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.filter_list_off,
-                          size: 40,
-                          color: Theme.of(context).colorScheme.outlineVariant),
-                      const SizedBox(height: 10),
-                      const Text('Sin registros para este cliente',
-                          style: TextStyle(color: Colors.grey)),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: diasOrdenados.length,
-                  itemBuilder: (ctx, idx) {
-                    final dia = diasOrdenados[idx];
-                    final entradas = porDia[dia]!;
-                    final fecha = DateTime.parse(dia);
-                    final esHoy = fecha.year == hoy.year &&
-                        fecha.month == hoy.month &&
-                        fecha.day == hoy.day;
-                    return _DiaTile(
-                      fecha: fecha,
-                      esHoy: esHoy,
-                      entradas: entradas,
-                      rangoTipo: widget.rangoTipo,
-                      showEdit: widget.showEdit,
-                    );
-                  },
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 16),
+            children: [
+              // ── Sección de HOY (siempre visible si incluirHoy) ────────────
+              if (widget.incluirHoy) ...[
+                _SeccionHoy(
+                  ingresos: hoyFiltrado,
+                  rangoTipo: widget.rangoTipo,
+                  showEdit: widget.showEdit,
                 ),
+              ],
+
+              // ── Días anteriores colapsables ───────────────────────────────
+              if (diasOrdenados.isNotEmpty) ...[
+                if (widget.incluirHoy)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text(
+                      'Días anteriores',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ...diasOrdenados.map((dia) {
+                  final entradas = porDia[dia]!;
+                  final fecha = DateTime.parse(dia);
+                  return _DiaTile(
+                    fecha: fecha,
+                    entradas: entradas,
+                    rangoTipo: widget.rangoTipo,
+                    showEdit: widget.showEdit,
+                  );
+                }),
+              ],
+
+              // Estado vacío cuando filtro activo no da resultados
+              if (widget.incluirHoy &&
+                  hoyFiltrado.isEmpty &&
+                  diasOrdenados.isEmpty &&
+                  _clienteIdFiltro != null)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Text('Sin registros para este cliente',
+                        style: TextStyle(color: Colors.grey)),
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );
   }
-
-  static String _claveDia(DateTime dt) =>
-      '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 }
 
-// ── Barra de filtros ──────────────────────────────────────────────────────────
+// ── Sección de HOY — siempre visible, sin ExpansionTile ──────────────────────
 
-class _FiltroClientes extends StatelessWidget {
-  final List<MapEntry<String, String>> clientes;
-  final String? seleccionado;
-  final ValueChanged<String?> onSeleccionado;
-  final bool esAves;
+class _SeccionHoy extends StatelessWidget {
+  final List<Ingreso> ingresos;
+  final String rangoTipo;
+  final bool showEdit;
 
-  const _FiltroClientes({
-    required this.clientes,
-    required this.seleccionado,
-    required this.onSeleccionado,
-    required this.esAves,
+  const _SeccionHoy({
+    required this.ingresos,
+    required this.rangoTipo,
+    required this.showEdit,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = esAves ? cs.primary : cs.tertiary;
-    final colorContainer = esAves ? cs.primaryContainer : cs.tertiaryContainer;
-    final colorOnContainer =
-        esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer;
+    final esAves = rangoTipo == kTipoAves;
 
-    return Container(
-      color: cs.surfaceContainerLowest,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+    if (ingresos.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: cs.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: FilterChip(
-                label: const Text('Todos'),
-                selected: seleccionado == null,
-                onSelected: (_) => onSeleccionado(null),
-                selectedColor: colorContainer,
-                checkmarkColor: colorOnContainer,
-                labelStyle: TextStyle(
-                  fontSize: 12,
-                  color: seleccionado == null ? colorOnContainer : null,
-                  fontWeight:
-                      seleccionado == null ? FontWeight.bold : FontWeight.normal,
-                ),
-                side: BorderSide(
-                  color: seleccionado == null ? color : cs.outlineVariant,
-                  width: seleccionado == null ? 1.5 : 1,
-                ),
-                showCheckmark: seleccionado == null,
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: esAves ? cs.primary : cs.tertiary,
+              child: Text(
+                'HOY',
+                style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: esAves ? cs.onPrimary : cs.onTertiary),
               ),
             ),
-            ...clientes.map((entry) {
-              final isSelected = seleccionado == entry.key;
-              return Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: FilterChip(
-                  label: Text(entry.value),
-                  selected: isSelected,
-                  onSelected: (_) =>
-                      onSeleccionado(isSelected ? null : entry.key),
-                  selectedColor: colorContainer,
-                  checkmarkColor: colorOnContainer,
-                  labelStyle: TextStyle(
-                    fontSize: 12,
-                    color: isSelected ? colorOnContainer : null,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  side: BorderSide(
-                    color: isSelected ? color : cs.outlineVariant,
-                    width: isSelected ? 1.5 : 1,
-                  ),
-                  showCheckmark: isSelected,
-                ),
-              );
-            }),
+            const SizedBox(width: 12),
+            Text(
+              'Sin ingresos hoy',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
           ],
         ),
+      );
+    }
+
+    // Agrupar por bloque
+    final Map<int, List<Ingreso>> porBloque = {};
+    for (final i in ingresos) {
+      porBloque.putIfAbsent(i.bloqueNro, () => []).add(i);
+    }
+    final bloquesOrdenados = porBloque.keys.toList()..sort();
+
+    final totalUnid = ingresos.fold(0, (s, i) => s + i.unidades);
+    final totalCan = ingresos.fold(0, (s, i) => s + i.canastillas);
+    final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Encabezado "Hoy"
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: (esAves ? cs.primary : cs.tertiary).withValues(alpha: 0.12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: esAves ? cs.primary : cs.tertiary,
+                  child: Text(
+                    'HOY',
+                    style: TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                        color: esAves ? cs.onPrimary : cs.onTertiary),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hoy — ${formatDateLong(DateTime.now())}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      Text(
+                        esAves
+                            ? '${formatNum(totalUnid)} unid. · ${formatKg(totalPeso)}'
+                            : '${formatNum(totalCan)} can. · ${formatKg(totalPeso)}',
+                        style:
+                            TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cs.secondaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${bloquesOrdenados.length} bloque${bloquesOrdenados.length == 1 ? '' : 's'}',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSecondaryContainer,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Bloques
+          ...bloquesOrdenados.map((nro) => _BloqueSeccion(
+                nro: nro,
+                items: porBloque[nro]!,
+                esAves: esAves,
+                showEdit: showEdit,
+              )),
+        ],
       ),
     );
   }
 }
 
-// ── Tile de un día ────────────────────────────────────────────────────────────
+// ── Tile de un día anterior (colapsable) ──────────────────────────────────────
 
 class _DiaTile extends StatelessWidget {
   final DateTime fecha;
-  final bool esHoy;
   final List<Ingreso> entradas;
   final String rangoTipo;
   final bool showEdit;
 
   const _DiaTile({
     required this.fecha,
-    required this.esHoy,
     required this.entradas,
     required this.rangoTipo,
     required this.showEdit,
@@ -269,31 +343,22 @@ class _DiaTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        // Expandir automáticamente el día de hoy
-        initiallyExpanded: esHoy,
         leading: CircleAvatar(
           radius: 20,
           backgroundColor:
-              esHoy
-                  ? (esAves ? cs.primary : cs.tertiary)
-                  : (esAves ? cs.primaryContainer : cs.tertiaryContainer),
+              esAves ? cs.primaryContainer : cs.tertiaryContainer,
           child: Text(
-            esHoy ? 'HOY' : fecha.day.toString(),
+            fecha.day.toString(),
             style: TextStyle(
-              fontSize: esHoy ? 9 : 14,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: esHoy
-                  ? (esAves ? cs.onPrimary : cs.onTertiary)
-                  : (esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer),
+              color: esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer,
             ),
           ),
         ),
         title: Text(
-          esHoy ? 'Hoy — ${formatDateLong(fecha)}' : formatDateLong(fecha),
-          style: TextStyle(
-            fontWeight: esHoy ? FontWeight.bold : FontWeight.w600,
-            fontSize: 14,
-          ),
+          formatDateLong(fecha),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
         subtitle: Text(
           esAves
@@ -336,7 +401,7 @@ class _DiaTile extends StatelessWidget {
   }
 }
 
-// ── Sección de bloque ─────────────────────────────────────────────────────────
+// ── Sección de un bloque ──────────────────────────────────────────────────────
 
 class _BloqueSeccion extends StatelessWidget {
   final int nro;
@@ -368,7 +433,6 @@ class _BloqueSeccion extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Encabezado de bloque
         Container(
           color: cs.surfaceContainerLow,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
@@ -390,13 +454,11 @@ class _BloqueSeccion extends StatelessWidget {
                 esAves
                     ? '${formatNum(totalUnid)} unid. · ${formatKg(totalPeso)}'
                     : '${formatNum(totalCan)} can. · ${formatKg(totalPeso)}',
-                style:
-                    TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ],
           ),
         ),
-        // Tiles de ingresos
         ...items.map(
           (i) => MovimientoTile(
             rangoNombre: i.rangoNombre,
@@ -498,6 +560,90 @@ class _BloqueSeccion extends StatelessWidget {
             child: const Text('Cancelar'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Barra de filtros por cliente ──────────────────────────────────────────────
+
+class _FiltroClientes extends StatelessWidget {
+  final List<MapEntry<String, String>> clientes;
+  final String? seleccionado;
+  final ValueChanged<String?> onSeleccionado;
+  final bool esAves;
+
+  const _FiltroClientes({
+    required this.clientes,
+    required this.seleccionado,
+    required this.onSeleccionado,
+    required this.esAves,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = esAves ? cs.primary : cs.tertiary;
+    final colorContainer = esAves ? cs.primaryContainer : cs.tertiaryContainer;
+    final colorOnContainer =
+        esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer;
+
+    return Container(
+      color: cs.surfaceContainerLowest,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: FilterChip(
+                label: const Text('Todos'),
+                selected: seleccionado == null,
+                onSelected: (_) => onSeleccionado(null),
+                selectedColor: colorContainer,
+                checkmarkColor: colorOnContainer,
+                labelStyle: TextStyle(
+                  fontSize: 12,
+                  color: seleccionado == null ? colorOnContainer : null,
+                  fontWeight: seleccionado == null
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                ),
+                side: BorderSide(
+                  color: seleccionado == null ? color : cs.outlineVariant,
+                  width: seleccionado == null ? 1.5 : 1,
+                ),
+                showCheckmark: seleccionado == null,
+              ),
+            ),
+            ...clientes.map((entry) {
+              final isSelected = seleccionado == entry.key;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: FilterChip(
+                  label: Text(entry.value),
+                  selected: isSelected,
+                  onSelected: (_) =>
+                      onSeleccionado(isSelected ? null : entry.key),
+                  selectedColor: colorContainer,
+                  checkmarkColor: colorOnContainer,
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    color: isSelected ? colorOnContainer : null,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  side: BorderSide(
+                    color: isSelected ? color : cs.outlineVariant,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                  showCheckmark: isSelected,
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
