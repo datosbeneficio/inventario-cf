@@ -16,6 +16,7 @@ import 'modules/cuarto_frio/models/despacho.dart';
 import 'shared/models/empresa_config.dart';
 import 'shared/providers/auth_provider.dart';
 import 'shared/services/firestore_service.dart';
+import 'shared/services/ciclo_auto_reset_service.dart';
 import 'app.dart';
 
 void main() async {
@@ -28,6 +29,11 @@ void main() async {
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
+
+  // Auto-reset del ciclo: si al abrir la app el ciclo activo corresponde
+  // a un día anterior, lo reinicia automáticamente sin intervención del
+  // coordinador (fallback por si se olvidó al cerrar el turno).
+  CicloAutoResetService.start();
 
   runApp(
     MultiProvider(
