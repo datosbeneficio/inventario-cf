@@ -2,22 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/ingreso.dart';
 import '../../widgets/consolidado_panel.dart';
-import '../../../../shared/models/cliente.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/services/firestore_service.dart';
 import '../../widgets/menudencias_form.dart';
 import '../../widgets/inventario_panel.dart';
 import '../../widgets/historial_ingresos_panel.dart';
-import '../../../../shared/widgets/movimiento_tile.dart';
 import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/calculadora_dialog.dart';
 import '../../../../shared/widgets/connectivity_icon.dart';
-import '../../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../../shared/widgets/delete_guard_button.dart';
-import '../../../../shared/models/empresa_config.dart';
-import '../../../../shared/providers/delete_guard_provider.dart';
 import '../../../../shared/utils/constants.dart';
-import '../../../../shared/utils/formatters.dart';
 
 class SupervisorMenudenciasHome extends StatefulWidget {
   const SupervisorMenudenciasHome({super.key});
@@ -35,7 +29,7 @@ class _SupervisorMenudenciasHomeState
   static const _titles = [
     'Inventario Menudencias',
     'Registrar Ingreso',
-    'Historial',
+    'Registros',
     'Consolidado',
   ];
 
@@ -45,8 +39,6 @@ class _SupervisorMenudenciasHomeState
     WidgetsBinding.instance.addPostFrameCallback((_) => _sincronizarBloque());
   }
 
-  /// Al iniciar, detecta el bloque más alto del día actual para no
-  /// reiniciar el contador si el operario recarga la página.
   void _sincronizarBloque() {
     if (!mounted) return;
     final hoy = DateTime.now();
@@ -99,11 +91,17 @@ class _SupervisorMenudenciasHomeState
         index: _tab,
         children: [
           const InventarioPanel(soloTipo: kTipoMenudencias),
-          _IngresoMenudBody(
+          // Tab Registrar: solo el formulario, sin lista al lado
+          _FormTab(
             bloqueActual: _bloqueActual,
             onNuevoBloque: _nuevoBloque,
           ),
-          const HistorialIngresosPanel(rangoTipo: kTipoMenudencias),
+          // Tab Registros: historial + hoy, con edición y borrado protegido
+          const HistorialIngresosPanel(
+            rangoTipo: kTipoMenudencias,
+            incluirHoy: true,
+            showEdit: true,
+          ),
           const ConsolidadoPanel(),
         ],
       ),
@@ -112,11 +110,17 @@ class _SupervisorMenudenciasHomeState
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
           NavigationDestination(
-              icon: Icon(Icons.inventory_2), label: 'Inventario'),
+              icon: Icon(Icons.inventory_2_outlined),
+              selectedIcon: Icon(Icons.inventory_2),
+              label: 'Inventario'),
           NavigationDestination(
-              icon: Icon(Icons.add_box), label: 'Registrar'),
+              icon: Icon(Icons.add_box_outlined),
+              selectedIcon: Icon(Icons.add_box),
+              label: 'Registrar'),
           NavigationDestination(
-              icon: Icon(Icons.history), label: 'Historial'),
+              icon: Icon(Icons.list_alt_outlined),
+              selectedIcon: Icon(Icons.list_alt),
+              label: 'Registros'),
           NavigationDestination(
               icon: Icon(Icons.analytics_outlined),
               selectedIcon: Icon(Icons.analytics),
@@ -127,60 +131,13 @@ class _SupervisorMenudenciasHomeState
   }
 }
 
-// ── Pestaña registro de ingreso de menudencias ─────────────────────────────
+// ── Tab de registro: solo el formulario ──────────────────────────────────────
 
-class _IngresoMenudBody extends StatelessWidget {
+class _FormTab extends StatelessWidget {
   final int bloqueActual;
   final VoidCallback onNuevoBloque;
 
-  const _IngresoMenudBody({
-    required this.bloqueActual,
-    required this.onNuevoBloque,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final todos = context.watch<List<Ingreso>>();
-    final hoy = DateTime.now();
-    final hoysIngresos = todos
-        .where((i) =>
-            i.rangoTipo == kTipoMenudencias &&
-            i.timestamp.year == hoy.year &&
-            i.timestamp.month == hoy.month &&
-            i.timestamp.day == hoy.day)
-        .toList();
-
-    return LayoutBuilder(
-      builder: (ctx, constraints) {
-        final form = _FormPanel(
-          bloqueActual: bloqueActual,
-          onNuevoBloque: onNuevoBloque,
-        );
-        final list = _ListaIngresos(ingresos: hoysIngresos);
-        if (constraints.maxWidth >= 700) {
-          return Row(children: [
-            SizedBox(width: 380, child: form),
-            const VerticalDivider(width: 1),
-            Expanded(child: list),
-          ]);
-        }
-        return Column(children: [
-          Expanded(flex: 3, child: form),
-          const Divider(),
-          Expanded(flex: 2, child: list),
-        ]);
-      },
-    );
-  }
-}
-
-// ── Formulario ────────────────────────────────────────────────────────────────
-
-class _FormPanel extends StatelessWidget {
-  final int bloqueActual;
-  final VoidCallback onNuevoBloque;
-
-  const _FormPanel({
+  const _FormTab({
     required this.bloqueActual,
     required this.onNuevoBloque,
   });
@@ -194,7 +151,7 @@ class _FormPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Indicador de bloque activo ──────────────────────────────
+          // Indicador de bloque activo
           Row(
             children: [
               Chip(
@@ -220,7 +177,6 @@ class _FormPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-
           Text(
             'Registrar Ingreso — Menudencias',
             style: Theme.of(context)
@@ -252,172 +208,6 @@ class _FormPanel extends StatelessWidget {
               unidades: unidades,
               bloqueNro: bloqueActual,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Lista de ingresos del día agrupada por bloque ─────────────────────────────
-
-class _ListaIngresos extends StatelessWidget {
-  final List<Ingreso> ingresos;
-  const _ListaIngresos({required this.ingresos});
-
-  @override
-  Widget build(BuildContext context) {
-    if (ingresos.isEmpty) {
-      return const Center(child: Text('Sin ingresos de menudencias hoy'));
-    }
-
-    final cs = Theme.of(context).colorScheme;
-    final deleteCodigoSet = context
-        .select<EmpresaConfig, bool>((e) => e.codigoEliminacion.isNotEmpty);
-    final deleteDesbloqueado =
-        context.select<DeleteGuardProvider, bool>((g) => g.isUnlocked);
-    final canDelete = !deleteCodigoSet || deleteDesbloqueado;
-
-    final totalCan = ingresos.fold(0, (s, i) => s + i.canastillas);
-    final totalPeso = ingresos.fold(0.0, (s, i) => s + i.peso);
-
-    // Agrupar por bloque (orden ascendente)
-    final Map<int, List<Ingreso>> porBloque = {};
-    for (final i in ingresos) {
-      porBloque.putIfAbsent(i.bloqueNro, () => []).add(i);
-    }
-    final bloques = porBloque.keys.toList()..sort();
-
-    // Construir lista plana con encabezados de bloque
-    final List<Widget> items = [];
-
-    // Resumen global
-    items.add(Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: Row(
-        children: [
-          Text('Ingresos de hoy (${ingresos.length})',
-              style: const TextStyle(fontWeight: FontWeight.bold)),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('${formatNum(totalCan)} canastillas',
-                  style: const TextStyle(fontSize: 12)),
-              Text(formatKg(totalPeso),
-                  style: const TextStyle(fontSize: 12)),
-            ],
-          ),
-        ],
-      ),
-    ));
-
-    for (final nro in bloques) {
-      final entries = porBloque[nro]!;
-      final bCan = entries.fold(0, (s, i) => s + i.canastillas);
-      final bPeso = entries.fold(0.0, (s, i) => s + i.peso);
-
-      // Encabezado de bloque
-      items.add(Container(
-        color: cs.surfaceContainerLow,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-        child: Row(
-          children: [
-            Icon(Icons.workspaces_outlined, size: 14, color: cs.tertiary),
-            const SizedBox(width: 6),
-            Text(
-              'Bloque $nro',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: cs.tertiary),
-            ),
-            const Spacer(),
-            Text(
-              '${formatNum(bCan)} can. · ${formatKg(bPeso)}',
-              style:
-                  TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ));
-
-      // Entradas del bloque
-      for (final ingreso in entries) {
-        items.add(MovimientoTile(
-          rangoNombre: ingreso.rangoNombre,
-          clienteNombre: ingreso.clienteNombre.isNotEmpty
-              ? ingreso.clienteNombre
-              : null,
-          unidades: ingreso.unidades,
-          peso: ingreso.peso,
-          esCola: false,
-          canastillas: ingreso.canastillas,
-          timestamp: ingreso.timestamp,
-          onEdit: () => _showEditDialog(context, ingreso),
-          onDelete: canDelete
-              ? () async {
-                  final ok = await showConfirmDelete(
-                      context,
-                      '${ingreso.rangoNombre} — '
-                      '${formatNum(ingreso.canastillas)} canastillas');
-                  if (ok) {
-                    FirestoreService.instance.deleteIngreso(ingreso.id);
-                  }
-                }
-              : null,
-        ));
-      }
-    }
-
-    items.add(const SizedBox(height: 16));
-
-    return ListView(children: items);
-  }
-
-  void _showEditDialog(BuildContext context, Ingreso ingreso) {
-    final clientes = context.read<List<Cliente>>();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar ingreso'),
-        content: SizedBox(
-          width: 360,
-          child: SingleChildScrollView(
-            child: Provider<List<Cliente>>.value(
-              value: clientes,
-              child: MenudenciasForm(
-                submitLabel: 'Guardar cambios',
-                initialClienteId: ingreso.clienteId,
-                initialRangoId: ingreso.rangoId,
-                initialCanastillas: ingreso.canastillas,
-                initialPeso: ingreso.peso,
-                onSubmit: ({
-                  required clienteId,
-                  required clienteNombre,
-                  required rangoId,
-                  required rangoNombre,
-                  required canastillas,
-                  required unidades,
-                  required peso,
-                }) async {
-                  await FirestoreService.instance.updateIngreso(
-                    ingreso.id,
-                    canastillas: canastillas,
-                    peso: peso,
-                    esCola: false,
-                    unidades: unidades,
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                },
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
           ),
         ],
       ),

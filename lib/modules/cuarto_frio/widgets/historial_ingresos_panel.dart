@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/ingreso.dart';
+import '../../../shared/models/cliente.dart';
 import '../../../shared/models/empresa_config.dart';
 import '../../../shared/providers/delete_guard_provider.dart';
 import '../../../shared/services/firestore_service.dart';
@@ -8,20 +9,33 @@ import '../../../shared/utils/constants.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../shared/widgets/movimiento_tile.dart';
+import 'entrada_form.dart';
+import 'menudencias_form.dart';
 
-/// Panel de historial de ingresos agrupados por día y bloque.
-/// Solo muestra días anteriores al día actual.
-/// Incluye barra de filtros por cliente.
+/// Panel de registros de ingresos agrupados por día y bloque.
+///
+/// [incluirHoy] — cuando true, incluye los registros del día actual
+///   (útil en el tab "Registros" que reemplaza al antiguo Historial).
+///   Cuando false (por defecto) solo muestra días anteriores.
+///
+/// [showEdit] — cuando true, muestra el botón de edición en cada tile.
 class HistorialIngresosPanel extends StatefulWidget {
   final String rangoTipo;
-  const HistorialIngresosPanel({super.key, required this.rangoTipo});
+  final bool incluirHoy;
+  final bool showEdit;
+
+  const HistorialIngresosPanel({
+    super.key,
+    required this.rangoTipo,
+    this.incluirHoy = false,
+    this.showEdit = false,
+  });
 
   @override
   State<HistorialIngresosPanel> createState() => _HistorialIngresosPanelState();
 }
 
 class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
-  /// null = todos los clientes
   String? _clienteIdFiltro;
 
   @override
@@ -29,16 +43,19 @@ class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
     final todos = context.watch<List<Ingreso>>();
     final hoy = DateTime.now();
 
-    // Solo ingresos del tipo correcto y de días anteriores al hoy
-    final historicos = todos.where((i) {
+    final registros = todos.where((i) {
       if (i.rangoTipo != widget.rangoTipo) return false;
-      final t = i.timestamp;
-      return !(t.year == hoy.year &&
-          t.month == hoy.month &&
-          t.day == hoy.day);
+      if (!widget.incluirHoy) {
+        final t = i.timestamp;
+        final esHoy = t.year == hoy.year &&
+            t.month == hoy.month &&
+            t.day == hoy.day;
+        if (esHoy) return false;
+      }
+      return true;
     }).toList();
 
-    if (historicos.isEmpty) {
+    if (registros.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -47,56 +64,49 @@ class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
                 size: 48,
                 color: Theme.of(context).colorScheme.outlineVariant),
             const SizedBox(height: 12),
-            const Text('Sin historial de días anteriores',
-                style: TextStyle(color: Colors.grey)),
+            Text(
+              widget.incluirHoy
+                  ? 'Sin registros aún'
+                  : 'Sin historial de días anteriores',
+              style: const TextStyle(color: Colors.grey),
+            ),
           ],
         ),
       );
     }
 
-    // Clientes únicos presentes en el historial (orden alfabético)
-    final clientesMap = <String, String>{}; // id → nombre
-    for (final i in historicos) {
-      if (i.clienteId.isNotEmpty) {
-        clientesMap[i.clienteId] = i.clienteNombre;
-      }
+    // Clientes únicos (orden alfabético)
+    final clientesMap = <String, String>{};
+    for (final i in registros) {
+      if (i.clienteId.isNotEmpty) clientesMap[i.clienteId] = i.clienteNombre;
     }
     final clientes = clientesMap.entries.toList()
       ..sort((a, b) => a.value.compareTo(b.value));
 
-    // Si el filtro seleccionado ya no existe en el historial, resetear
-    if (_clienteIdFiltro != null &&
-        !clientesMap.containsKey(_clienteIdFiltro)) {
+    if (_clienteIdFiltro != null && !clientesMap.containsKey(_clienteIdFiltro)) {
       _clienteIdFiltro = null;
     }
 
-    // Aplicar filtro
     final filtrados = _clienteIdFiltro == null
-        ? historicos
-        : historicos.where((i) => i.clienteId == _clienteIdFiltro).toList();
+        ? registros
+        : registros.where((i) => i.clienteId == _clienteIdFiltro).toList();
 
-    // Agrupar por día (clave: 'yyyy-MM-dd')
+    // Agrupar por día
     final Map<String, List<Ingreso>> porDia = {};
     for (final i in filtrados) {
-      final k = _claveDia(i.timestamp);
-      porDia.putIfAbsent(k, () => []).add(i);
+      porDia.putIfAbsent(_claveDia(i.timestamp), () => []).add(i);
     }
-
-    // Ordenar días de más reciente a más antiguo
-    final diasOrdenados = porDia.keys.toList()
-      ..sort((a, b) => b.compareTo(a));
+    final diasOrdenados = porDia.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return Column(
       children: [
-        // ── Barra de filtros ───────────────────────────────────────────
-        if (clientes.length > 1) _FiltroClientes(
-          clientes: clientes,
-          seleccionado: _clienteIdFiltro,
-          onSeleccionado: (id) => setState(() => _clienteIdFiltro = id),
-          esAves: widget.rangoTipo == kTipoAves,
-        ),
-
-        // ── Lista de días ──────────────────────────────────────────────
+        if (clientes.length > 1)
+          _FiltroClientes(
+            clientes: clientes,
+            seleccionado: _clienteIdFiltro,
+            onSeleccionado: (id) => setState(() => _clienteIdFiltro = id),
+            esAves: widget.rangoTipo == kTipoAves,
+          ),
         Expanded(
           child: filtrados.isEmpty
               ? Center(
@@ -119,20 +129,15 @@ class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
                     final dia = diasOrdenados[idx];
                     final entradas = porDia[dia]!;
                     final fecha = DateTime.parse(dia);
-                    final totalUnid =
-                        entradas.fold(0, (s, i) => s + i.unidades);
-                    final totalCan =
-                        entradas.fold(0, (s, i) => s + i.canastillas);
-                    final totalPeso =
-                        entradas.fold(0.0, (s, i) => s + i.peso);
-
+                    final esHoy = fecha.year == hoy.year &&
+                        fecha.month == hoy.month &&
+                        fecha.day == hoy.day;
                     return _DiaTile(
                       fecha: fecha,
+                      esHoy: esHoy,
                       entradas: entradas,
-                      totalUnid: totalUnid,
-                      totalCan: totalCan,
-                      totalPeso: totalPeso,
                       rangoTipo: widget.rangoTipo,
+                      showEdit: widget.showEdit,
                     );
                   },
                 ),
@@ -145,7 +150,7 @@ class _HistorialIngresosPanelState extends State<HistorialIngresosPanel> {
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 }
 
-// ── Barra de filtros por cliente ──────────────────────────────────────────────
+// ── Barra de filtros ──────────────────────────────────────────────────────────
 
 class _FiltroClientes extends StatelessWidget {
   final List<MapEntry<String, String>> clientes;
@@ -164,8 +169,7 @@ class _FiltroClientes extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final color = esAves ? cs.primary : cs.tertiary;
-    final colorContainer =
-        esAves ? cs.primaryContainer : cs.tertiaryContainer;
+    final colorContainer = esAves ? cs.primaryContainer : cs.tertiaryContainer;
     final colorOnContainer =
         esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer;
 
@@ -176,7 +180,6 @@ class _FiltroClientes extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            // Chip "Todos"
             Padding(
               padding: const EdgeInsets.only(right: 6),
               child: FilterChip(
@@ -188,9 +191,8 @@ class _FiltroClientes extends StatelessWidget {
                 labelStyle: TextStyle(
                   fontSize: 12,
                   color: seleccionado == null ? colorOnContainer : null,
-                  fontWeight: seleccionado == null
-                      ? FontWeight.bold
-                      : FontWeight.normal,
+                  fontWeight:
+                      seleccionado == null ? FontWeight.bold : FontWeight.normal,
                 ),
                 side: BorderSide(
                   color: seleccionado == null ? color : cs.outlineVariant,
@@ -199,7 +201,6 @@ class _FiltroClientes extends StatelessWidget {
                 showCheckmark: seleccionado == null,
               ),
             ),
-            // Un chip por cliente
             ...clientes.map((entry) {
               final isSelected = seleccionado == entry.key;
               return Padding(
@@ -236,19 +237,17 @@ class _FiltroClientes extends StatelessWidget {
 
 class _DiaTile extends StatelessWidget {
   final DateTime fecha;
+  final bool esHoy;
   final List<Ingreso> entradas;
-  final int totalUnid;
-  final int totalCan;
-  final double totalPeso;
   final String rangoTipo;
+  final bool showEdit;
 
   const _DiaTile({
     required this.fecha,
+    required this.esHoy,
     required this.entradas,
-    required this.totalUnid,
-    required this.totalCan,
-    required this.totalPeso,
     required this.rangoTipo,
+    required this.showEdit,
   });
 
   @override
@@ -256,7 +255,10 @@ class _DiaTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final esAves = rangoTipo == kTipoAves;
 
-    // Agrupar por bloque dentro del día
+    final totalUnid = entradas.fold(0, (s, i) => s + i.unidades);
+    final totalCan = entradas.fold(0, (s, i) => s + i.canastillas);
+    final totalPeso = entradas.fold(0.0, (s, i) => s + i.peso);
+
     final Map<int, List<Ingreso>> porBloque = {};
     for (final i in entradas) {
       porBloque.putIfAbsent(i.bloqueNro, () => []).add(i);
@@ -267,21 +269,31 @@ class _DiaTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
+        // Expandir automáticamente el día de hoy
+        initiallyExpanded: esHoy,
         leading: CircleAvatar(
           radius: 20,
           backgroundColor:
-              esAves ? cs.primaryContainer : cs.tertiaryContainer,
+              esHoy
+                  ? (esAves ? cs.primary : cs.tertiary)
+                  : (esAves ? cs.primaryContainer : cs.tertiaryContainer),
           child: Text(
-            fecha.day.toString(),
+            esHoy ? 'HOY' : fecha.day.toString(),
             style: TextStyle(
+              fontSize: esHoy ? 9 : 14,
               fontWeight: FontWeight.bold,
-              color: esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer,
+              color: esHoy
+                  ? (esAves ? cs.onPrimary : cs.onTertiary)
+                  : (esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer),
             ),
           ),
         ),
         title: Text(
-          formatDateLong(fecha),
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          esHoy ? 'Hoy — ${formatDateLong(fecha)}' : formatDateLong(fecha),
+          style: TextStyle(
+            fontWeight: esHoy ? FontWeight.bold : FontWeight.w600,
+            fontSize: 14,
+          ),
         ),
         subtitle: Text(
           esAves
@@ -311,50 +323,42 @@ class _DiaTile extends StatelessWidget {
             const Icon(Icons.expand_more),
           ],
         ),
-        children: bloquesOrdenados.map((nro) {
-          final bItems = porBloque[nro]!;
-          final bUnid = bItems.fold(0, (s, i) => s + i.unidades);
-          final bCan = bItems.fold(0, (s, i) => s + i.canastillas);
-          final bPeso = bItems.fold(0.0, (s, i) => s + i.peso);
-
-          return _BloqueSeccion(
-            nro: nro,
-            items: bItems,
-            totalUnid: bUnid,
-            totalCan: bCan,
-            totalPeso: bPeso,
-            esAves: esAves,
-          );
-        }).toList(),
+        children: bloquesOrdenados
+            .map((nro) => _BloqueSeccion(
+                  nro: nro,
+                  items: porBloque[nro]!,
+                  esAves: esAves,
+                  showEdit: showEdit,
+                ))
+            .toList(),
       ),
     );
   }
 }
 
-// ── Seccion de un bloque dentro del dia expandido ─────────────────────────────
+// ── Sección de bloque ─────────────────────────────────────────────────────────
 
 class _BloqueSeccion extends StatelessWidget {
   final int nro;
   final List<Ingreso> items;
-  final int totalUnid;
-  final int totalCan;
-  final double totalPeso;
   final bool esAves;
+  final bool showEdit;
 
   const _BloqueSeccion({
     required this.nro,
     required this.items,
-    required this.totalUnid,
-    required this.totalCan,
-    required this.totalPeso,
     required this.esAves,
+    required this.showEdit,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // Guard de eliminación para registros históricos
+    final totalUnid = items.fold(0, (s, i) => s + i.unidades);
+    final totalCan = items.fold(0, (s, i) => s + i.canastillas);
+    final totalPeso = items.fold(0.0, (s, i) => s + i.peso);
+
     final deleteCodigoSet = context
         .select<EmpresaConfig, bool>((e) => e.codigoEliminacion.isNotEmpty);
     final deleteDesbloqueado =
@@ -364,7 +368,7 @@ class _BloqueSeccion extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Encabezado del bloque
+        // Encabezado de bloque
         Container(
           color: cs.surfaceContainerLow,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
@@ -386,36 +390,115 @@ class _BloqueSeccion extends StatelessWidget {
                 esAves
                     ? '${formatNum(totalUnid)} unid. · ${formatKg(totalPeso)}'
                     : '${formatNum(totalCan)} can. · ${formatKg(totalPeso)}',
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                style:
+                    TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ],
           ),
         ),
-        // Entradas del bloque
+        // Tiles de ingresos
         ...items.map(
           (i) => MovimientoTile(
             rangoNombre: i.rangoNombre,
-            clienteNombre:
-                i.clienteNombre.isNotEmpty ? i.clienteNombre : null,
+            clienteNombre: i.clienteNombre.isNotEmpty ? i.clienteNombre : null,
             unidades: i.unidades,
             peso: i.peso,
             esCola: i.esCola,
             canastillas: i.canastillas,
             timestamp: i.timestamp,
+            onEdit: showEdit ? () => _showEditDialog(context, i) : null,
             onDelete: canDelete
                 ? () async {
                     final label = esAves
                         ? '${i.rangoNombre} — ${formatNum(i.unidades)} unid.'
                         : '${i.rangoNombre} — ${formatNum(i.canastillas)} canastillas';
                     final ok = await showConfirmDelete(context, label);
-                    if (ok) {
-                      FirestoreService.instance.deleteIngreso(i.id);
-                    }
+                    if (ok) FirestoreService.instance.deleteIngreso(i.id);
                   }
                 : null,
           ),
         ),
       ],
+    );
+  }
+
+  void _showEditDialog(BuildContext context, Ingreso ingreso) {
+    final clientes = context.read<List<Cliente>>();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar ingreso'),
+        content: SizedBox(
+          width: 360,
+          child: SingleChildScrollView(
+            child: Provider<List<Cliente>>.value(
+              value: clientes,
+              child: esAves
+                  ? EntradaForm(
+                      submitLabel: 'Guardar cambios',
+                      initialClienteId: ingreso.clienteId,
+                      initialRangoId: ingreso.rangoId,
+                      initialInputValue: ingreso.esCola
+                          ? ingreso.unidades
+                          : ingreso.canastillas,
+                      initialPeso: ingreso.peso,
+                      initialEsCola: ingreso.esCola,
+                      onSubmit: ({
+                        required clienteId,
+                        required clienteNombre,
+                        required rangoId,
+                        required rangoNombre,
+                        required inputValue,
+                        required peso,
+                        required esCola,
+                        required multiplicador,
+                      }) async {
+                        await FirestoreService.instance.updateIngreso(
+                          ingreso.id,
+                          canastillas: esCola ? 1 : inputValue,
+                          peso: peso,
+                          esCola: esCola,
+                          unidades: FirestoreService.calcularUnidades(
+                              esCola, inputValue, multiplicador),
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                    )
+                  : MenudenciasForm(
+                      submitLabel: 'Guardar cambios',
+                      initialClienteId: ingreso.clienteId,
+                      initialRangoId: ingreso.rangoId,
+                      initialCanastillas: ingreso.canastillas,
+                      initialPeso: ingreso.peso,
+                      onSubmit: ({
+                        required clienteId,
+                        required clienteNombre,
+                        required rangoId,
+                        required rangoNombre,
+                        required canastillas,
+                        required unidades,
+                        required peso,
+                      }) async {
+                        await FirestoreService.instance.updateIngreso(
+                          ingreso.id,
+                          canastillas: canastillas,
+                          peso: peso,
+                          esCola: false,
+                          unidades: unidades,
+                        );
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                    ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
     );
   }
 }
