@@ -314,32 +314,25 @@ class _ListaIngresos extends StatelessWidget {
       final entries = porBloque[nro]!;
       final bUnid = entries.fold(0, (s, i) => s + i.unidades);
       final bPeso = entries.fold(0.0, (s, i) => s + i.peso);
+      final esUltimo = nro == bloques.last;
 
-      items.add(Container(
-        color: cs.surfaceContainerLow,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-        child: Row(
-          children: [
-            Icon(Icons.workspaces_outlined, size: 14, color: cs.primary),
-            const SizedBox(width: 6),
-            Text(
-              'Bloque $nro',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: cs.primary),
-            ),
-            const Spacer(),
-            Text(
-              '${formatNum(bUnid)} unid. · ${formatKg(bPeso)}',
-              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-            ),
-          ],
+      items.add(ExpansionTile(
+        initiallyExpanded: esUltimo,
+        leading: Icon(Icons.workspaces_outlined, size: 18, color: cs.primary),
+        title: Text(
+          'Bloque $nro',
+          style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: cs.primary),
         ),
-      ));
-
-      for (final ingreso in entries) {
-        items.add(MovimientoTile(
+        subtitle: Text(
+          '${formatNum(bUnid)} unid. · ${formatKg(bPeso)}',
+          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+        ),
+        collapsedBackgroundColor: cs.surfaceContainerLow,
+        backgroundColor: cs.surfaceContainerLowest,
+        children: entries.map((ingreso) => MovimientoTile(
           rangoNombre: ingreso.rangoNombre,
           clienteNombre: ingreso.clienteNombre.isNotEmpty
               ? ingreso.clienteNombre
@@ -361,8 +354,8 @@ class _ListaIngresos extends StatelessWidget {
                   }
                 }
               : null,
-        ));
-      }
+        )).toList(),
+      ));
     }
 
     items.add(const SizedBox(height: 16));
