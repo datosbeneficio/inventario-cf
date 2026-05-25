@@ -196,6 +196,17 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
                 icon: const Icon(Icons.save),
                 label: const Text('Guardar cambios'),
               ),
+              const SizedBox(height: 40),
+              const Text(
+                'Desarrollado por: Carlos Fernando Huérfano Gómez',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.black26,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
