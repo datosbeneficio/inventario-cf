@@ -103,7 +103,10 @@ class FirestoreService {
 
   Stream<List<Ingreso>> ingresosStream() => _db
       .collection(_colIngresos)
-      .orderBy('timestamp', descending: true)
+      // Sin orderBy: en Flutter web los documentos con serverTimestamp pendiente
+      // quedan excluidos de queries ordenadas por ese campo hasta que el servidor
+      // confirma, retrasando la actualización del inventario. Los widgets ordenan
+      // los datos por su cuenta (por día, bloque, cliente, etc.).
       .snapshots()
       .map((s) => s.docs.map(Ingreso.fromDoc).toList());
 
@@ -162,7 +165,8 @@ class FirestoreService {
 
   Stream<List<Salida>> salidasStream() => _db
       .collection(_colSalidas)
-      .orderBy('timestamp', descending: true)
+      // Sin orderBy: misma razón que ingresosStream (serverTimestamp pendiente
+      // excluye documentos de queries ordenadas en Flutter web).
       .snapshots()
       .map((s) => s.docs.map(Salida.fromDoc).toList());
 
@@ -395,12 +399,10 @@ class FirestoreService {
       .collection('config')
       .doc('ciclo')
       .snapshots()
-      // Ignorar escrituras pendientes (hasPendingWrites=true) para evitar
-      // que FieldValue.serverTimestamp() emita un evento con inicio=null
-      // mientras el servidor confirma. En Flutter web ese evento intermedio
-      // convierte inicio en DateTime(2000), lo que muestra TODOS los
-      // registros históricos y dispara un loop de resets.
-      .where((doc) => !doc.metadata.hasPendingWrites)
+      // Se incluyen escrituras pendientes (hasPendingWrites=true): cuando
+      // FieldValue.serverTimestamp() está en vuelo, fromDoc devuelve
+      // DateTime.now() en lugar de DateTime(2000), por lo que el inventario
+      // queda en cero correctamente y no se produce el loop de auto-reset.
       .map((doc) =>
           doc.exists ? CicloConfig.fromDoc(doc) : CicloConfig.initial());
 

@@ -22,9 +22,13 @@ class CicloConfig {
   factory CicloConfig.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
     return CicloConfig(
+      // Si el timestamp es null, significa que Firestore aún no confirmó el
+      // serverTimestamp (escritura pendiente en Flutter web). Usamos DateTime.now()
+      // para que el inventario quede en cero mientras se confirma, en lugar de
+      // DateTime(2000) que mostraría TODO el historial y dispararía el loop de reset.
       inicio: d['inicio'] != null
           ? (d['inicio'] as Timestamp).toDate()
-          : DateTime(2000),
+          : DateTime.now(),
       cicloId: d['cicloId'] ?? '',
     );
   }
