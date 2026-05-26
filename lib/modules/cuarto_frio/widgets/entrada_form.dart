@@ -94,6 +94,10 @@ class _EntradaFormState extends State<EntradaForm> {
     _esCola = widget.initialEsCola ?? false;
     if (widget.initialInputValue != null) {
       _inputCtrl.text = widget.initialInputValue.toString();
+    } else if (!_esCola) {
+      // Default de 6 canastillas para agilizar la digitación.
+      // Solo aplica a registro nuevo (no edición) en modo canastillas.
+      _inputCtrl.text = '6';
     }
     if (widget.initialPeso != null) {
       _pesoCtrl.text = widget.initialPeso.toString();
@@ -153,7 +157,7 @@ class _EntradaFormState extends State<EntradaForm> {
       setState(() {
         _submitting = false;
         if (widget.initialRangoId == null) {
-          _inputCtrl.clear();
+          _inputCtrl.text = '6'; // restaurar default tras registrar
           _pesoCtrl.clear();
           _esCola = false;
         }
@@ -287,7 +291,7 @@ class _EntradaFormState extends State<EntradaForm> {
                             _rangoObj = r;
                             _showRangoError = false;
                             if (widget.initialRangoId == null) {
-                              _inputCtrl.clear();
+                              _inputCtrl.text = '6'; // restaurar default al cambiar rango
                               _esCola = false;
                             }
                           }),
@@ -360,7 +364,9 @@ class _EntradaFormState extends State<EntradaForm> {
             value: _esCola,
             onChanged: (v) => setState(() {
               _esCola = v;
-              _inputCtrl.clear();
+              // Cola → vacío para que el operario ingrese unidades.
+              // Canastillas → restaurar default de 6.
+              _inputCtrl.text = v ? '' : '6';
             }),
             tileColor:
                 _esCola ? cs.tertiaryContainer.withValues(alpha: 0.3) : null,

@@ -88,6 +88,10 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
     _rangoId = widget.initialRangoId;
     if (widget.initialCanastillas != null) {
       _canastillasCtrl.text = widget.initialCanastillas.toString();
+    } else {
+      // Default de 6 canastillas para agilizar la digitación.
+      // Solo aplica a registro nuevo (no edición).
+      _canastillasCtrl.text = '6';
     }
     if (widget.initialPeso != null) {
       _pesoCtrl.text = widget.initialPeso.toString();
@@ -152,7 +156,7 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
       setState(() {
         _submitting = false;
         if (widget.initialRangoId == null) {
-          _canastillasCtrl.clear();
+          _canastillasCtrl.text = '6'; // restaurar default tras registrar
           _pesoCtrl.clear();
         }
       });
@@ -299,7 +303,7 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
                             _rangoObj = r;
                             _showRangoError = false;
                             if (widget.initialRangoId == null) {
-                              _canastillasCtrl.clear();
+                              _canastillasCtrl.text = '6'; // restaurar default al cambiar rango
                             }
                           }),
                         );
