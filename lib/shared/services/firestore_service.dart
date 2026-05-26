@@ -395,6 +395,12 @@ class FirestoreService {
       .collection('config')
       .doc('ciclo')
       .snapshots()
+      // Ignorar escrituras pendientes (hasPendingWrites=true) para evitar
+      // que FieldValue.serverTimestamp() emita un evento con inicio=null
+      // mientras el servidor confirma. En Flutter web ese evento intermedio
+      // convierte inicio en DateTime(2000), lo que muestra TODOS los
+      // registros históricos y dispara un loop de resets.
+      .where((doc) => !doc.metadata.hasPendingWrites)
       .map((doc) =>
           doc.exists ? CicloConfig.fromDoc(doc) : CicloConfig.initial());
 
