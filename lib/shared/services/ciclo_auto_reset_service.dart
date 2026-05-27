@@ -1,13 +1,15 @@
 import 'dart:async';
 import '../models/ciclo_config.dart';
 import 'firestore_service.dart';
+import 'local_cache_service.dart';
 
 /// Servicio que detecta automáticamente cuando el ciclo activo
 /// corresponde a un día anterior y ejecuta el reinicio sin intervención
 /// del coordinador.
 ///
-/// El coordinador puede reiniciar manualmente en cualquier momento;
-/// este servicio solo actúa como fallback cuando se olvidó hacerlo.
+/// También detecta cuando el cicloId cambió en Firestore (coordinador
+/// reinició desde otro dispositivo) y limpia el caché local IndexedDB
+/// para que todos los dispositivos vean datos frescos.
 ///
 /// Inicializar con [start()] después de Firebase.initializeApp().
 class CicloAutoResetService {
@@ -23,11 +25,24 @@ class CicloAutoResetService {
   static void start() {
     _sub?.cancel();
     _sub = FirestoreService.instance
-        .cicloConfigStream() // ya filtra hasPendingWrites
+        .cicloConfigStream()
         .listen((ciclo) async {
       // Ignorar el estado inicial (cicloId vacío = nunca se configuró).
       if (ciclo.cicloId.isEmpty) return;
 
+      // ── Detección de cambio de ciclo desde otro dispositivo ──────────────
+      // Si el coordinador reinició el ciclo (o limpió datos de prueba) desde
+      // otro dispositivo, el cicloId de Firestore será distinto al guardado
+      // en localStorage. En ese caso limpiamos el IndexedDB y recargamos para
+      // que este dispositivo trabaje con datos frescos.
+      if (LocalCacheService.cicloIdCambio(ciclo.cicloId)) {
+        LocalCacheService.guardarCicloId(ciclo.cicloId);
+        await LocalCacheService.limpiarCacheYRecargar();
+        return; // La página se recargará; el código de abajo no se ejecuta.
+      }
+      LocalCacheService.guardarCicloId(ciclo.cicloId);
+
+      // ── Auto-reset por cambio de día ─────────────────────────────────────
       final hoy = DateTime.now();
       final hoyFecha = DateTime(hoy.year, hoy.month, hoy.day);
 

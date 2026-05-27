@@ -12,6 +12,7 @@ import '../../../../shared/widgets/movimiento_tile.dart';
 import '../../../../shared/widgets/app_logo.dart';
 import '../../../../shared/widgets/calculadora_dialog.dart';
 import '../../../../shared/widgets/connectivity_icon.dart';
+import '../../../../shared/widgets/refresh_cache_button.dart';
 import '../../../../shared/widgets/confirm_delete_dialog.dart';
 import '../../../../shared/widgets/delete_guard_button.dart';
 import '../../../../shared/models/empresa_config.dart';
@@ -78,6 +79,7 @@ class _EncargadoHomeState extends State<EncargadoHome> {
         actions: [
           const ConnectivityIcon(),
           const AppLogo(),
+          const RefreshCacheButton(),
           const DeleteGuardButton(),
           IconButton(
             icon: const Icon(Icons.calculate_outlined),
