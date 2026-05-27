@@ -69,6 +69,11 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
             ),
           ),
           IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Limpiar datos de prueba',
+            onPressed: () => _confirmarLimpieza(context),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesión',
             onPressed: () => context.read<AuthProvider>().logout(),
@@ -270,6 +275,112 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _confirmarLimpieza(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
+
+    // Primera confirmación
+    final paso1 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.delete_sweep_outlined, size: 40, color: cs.error),
+        title: const Text('Limpiar datos de prueba'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Esta acción eliminará permanentemente:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            _BulletItem(
+              icon: Icons.delete_forever,
+              color: cs.error,
+              text: 'Todos los ingresos (cf_ingresos)',
+            ),
+            const SizedBox(height: 4),
+            _BulletItem(
+              icon: Icons.delete_forever,
+              color: cs.error,
+              text: 'Todas las salidas (cf_salidas)',
+            ),
+            const SizedBox(height: 4),
+            _BulletItem(
+              icon: Icons.check_circle_outline,
+              color: Colors.green,
+              text: 'Clientes, conductores, destinos y vehículos: intactos.',
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Esta acción NO se puede deshacer.',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onErrorContainer),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: cs.error, foregroundColor: cs.onError),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+
+    if (paso1 != true || !context.mounted) return;
+
+    // Segunda confirmación
+    final paso2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, size: 40, color: cs.error),
+        title: const Text('¿Estás absolutamente seguro?'),
+        content: const Text(
+          'Se eliminarán TODOS los ingresos y salidas registrados. '
+          'Los reportes históricos también quedarán vacíos. '
+          '\n\n¿Confirmas la limpieza total?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No, cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: cs.error, foregroundColor: cs.onError),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí, limpiar todo'),
+          ),
+        ],
+      ),
+    );
+
+    if (paso2 != true || !context.mounted) return;
+
+    await FirestoreService.instance.limpiarDatosPrueba();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Datos de prueba eliminados. Inventario en cero.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 }

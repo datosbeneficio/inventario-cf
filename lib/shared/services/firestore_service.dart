@@ -452,6 +452,26 @@ class FirestoreService {
     await batch.commit();
   }
 
+  /// Elimina TODOS los documentos de cf_ingresos y cf_salidas, y reinicia
+  /// el ciclo. Usar solo para limpiar datos de prueba.
+  /// Trabaja en lotes de 400 para respetar el límite de 500 ops por batch.
+  Future<void> limpiarDatosPrueba() async {
+    for (final col in [_colIngresos, _colSalidas]) {
+      QuerySnapshot snap;
+      do {
+        snap = await _db.collection(col).limit(400).get();
+        if (snap.docs.isEmpty) break;
+        final batch = _db.batch();
+        for (final doc in snap.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      } while (snap.docs.length == 400);
+    }
+    // Reiniciar el ciclo al momento actual
+    await resetCiclo();
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   static int calcularUnidades(bool esCola, int inputValue, double mult) {
