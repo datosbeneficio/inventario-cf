@@ -66,6 +66,16 @@ class _EntradaFormState extends State<EntradaForm> {
 
   Map<String, _Saldo> _saldoMap = {};
 
+  /// Stream cacheado para evitar que StreamBuilder se reinicie en cada rebuild.
+  /// Se recrea solo cuando cambia _clienteId.
+  Stream<List<Rango>>? _rangosStream;
+
+  void _actualizarRangosStream(String clienteId) {
+    _rangosStream = FirestoreService.instance
+        .rangosStream(clienteId)
+        .map((rs) => rs.where((r) => r.tipo == kTipoAves).toList());
+  }
+
   /// En modo edición, el rango se resuelve de forma asíncrona desde el stream.
   /// Bloqueamos el submit mientras no esté disponible para evitar el bug de
   /// validación silenciosa.
@@ -92,6 +102,7 @@ class _EntradaFormState extends State<EntradaForm> {
     _clienteId = widget.initialClienteId;
     _rangoId = widget.initialRangoId;
     _esCola = widget.initialEsCola ?? false;
+    if (_clienteId != null) _actualizarRangosStream(_clienteId!);
     if (widget.initialInputValue != null) {
       _inputCtrl.text = widget.initialInputValue.toString();
     } else if (!_esCola) {
@@ -208,6 +219,7 @@ class _EntradaFormState extends State<EntradaForm> {
               _rangoId = null;
               _rangoObj = null;
               _showRangoError = false;
+              if (v != null) _actualizarRangosStream(v);
             }),
             validator: (v) => v == null ? 'Selecciona un cliente' : null,
           ),
@@ -216,9 +228,7 @@ class _EntradaFormState extends State<EntradaForm> {
           // ── Chips de rango ────────────────────────────────────────────────
           if (_clienteId != null)
             StreamBuilder<List<Rango>>(
-              stream: FirestoreService.instance.rangosStream(_clienteId!).map(
-                    (rs) => rs.where((r) => r.tipo == kTipoAves).toList(),
-                  ),
+              stream: _rangosStream,
               builder: (ctx, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     (snapshot.data == null)) {

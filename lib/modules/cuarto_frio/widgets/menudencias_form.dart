@@ -64,6 +64,16 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
   // Se puebla en build() cuando soloConInventario == true
   Map<String, _Saldo> _saldoMap = {};
 
+  /// Stream cacheado para evitar que StreamBuilder se reinicie en cada rebuild.
+  /// Se recrea solo cuando cambia _clienteId.
+  Stream<List<Rango>>? _rangosStream;
+
+  void _actualizarRangosStream(String clienteId) {
+    _rangosStream = FirestoreService.instance
+        .rangosStream(clienteId)
+        .map((rs) => rs.where((r) => r.tipo == kTipoMenudencias).toList());
+  }
+
   /// En modo edición el rango llega asíncrono; bloqueamos submit mientras tanto.
   bool get _loadingRango =>
       widget.initialRangoId != null && _clienteId != null && _rangoObj == null;
@@ -86,6 +96,7 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
     super.initState();
     _clienteId = widget.initialClienteId;
     _rangoId = widget.initialRangoId;
+    if (_clienteId != null) _actualizarRangosStream(_clienteId!);
     if (widget.initialCanastillas != null) {
       _canastillasCtrl.text = widget.initialCanastillas.toString();
     } else {
@@ -207,6 +218,7 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
               _rangoId = null;
               _rangoObj = null;
               _showRangoError = false;
+              if (v != null) _actualizarRangosStream(v);
             }),
             validator: (v) => v == null ? 'Selecciona un cliente' : null,
           ),
@@ -215,11 +227,7 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
           // ── Chips de rango ────────────────────────────────────────────────
           if (_clienteId != null)
             StreamBuilder<List<Rango>>(
-              stream: FirestoreService.instance.rangosStream(_clienteId!).map(
-                    (rs) => rs
-                        .where((r) => r.tipo == kTipoMenudencias)
-                        .toList(),
-                  ),
+              stream: _rangosStream,
               builder: (ctx, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     snapshot.data == null) {
