@@ -408,10 +408,34 @@ class FirestoreService {
 
   /// Inicia un nuevo ciclo: a partir de este momento el inventario
   /// visible empieza desde cero. Los registros anteriores se conservan.
-  Future<void> resetCiclo() => _db.collection('config').doc('ciclo').set({
+  ///
+  /// Usa una transacción para garantizar idempotencia: si el ciclo ya fue
+  /// reiniciado hoy (por otro dispositivo que ganó la carrera), esta llamada
+  /// no sobreescribe — así se evita la cascada de cicloIds cuando varios
+  /// dispositivos detectan el cambio de día simultáneamente.
+  Future<void> resetCiclo() async {
+    final ref = _db.collection('config').doc('ciclo');
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>;
+        final inicio = data['inicio'];
+        if (inicio is Timestamp) {
+          final dt = inicio.toDate();
+          final hoy = DateTime.now();
+          if (dt.year == hoy.year &&
+              dt.month == hoy.month &&
+              dt.day == hoy.day) {
+            return; // Ya reiniciado hoy por otro dispositivo; no hacer nada.
+          }
+        }
+      }
+      tx.set(ref, {
         'inicio': FieldValue.serverTimestamp(),
         'cicloId': const Uuid().v4(),
       });
+    });
+  }
 
   /// Reinicia el ciclo Y crea ingresos remanente en una sola operación atómica.
   /// [items] son los registros de producto que se trasladan al nuevo ciclo.

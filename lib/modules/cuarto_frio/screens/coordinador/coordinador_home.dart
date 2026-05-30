@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../shared/models/ciclo_config.dart';
 import '../../../../shared/providers/auth_provider.dart';
+import '../../../../shared/services/ciclo_auto_reset_service.dart';
 import '../../../../shared/services/firestore_service.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_logo.dart';
@@ -182,10 +183,11 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
     final seleccionados = result;
 
     if (seleccionados.isEmpty) {
-      await FirestoreService.instance.resetCiclo();
+      await CicloAutoResetService.ejecutarReset(
+          FirestoreService.instance.resetCiclo);
     } else {
-      await FirestoreService.instance
-          .resetCicloConRemanente(seleccionados);
+      await CicloAutoResetService.ejecutarReset(
+          () => FirestoreService.instance.resetCicloConRemanente(seleccionados));
     }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -266,7 +268,8 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
     );
 
     if (ok == true && context.mounted) {
-      await FirestoreService.instance.resetCiclo();
+      await CicloAutoResetService.ejecutarReset(
+          FirestoreService.instance.resetCiclo);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -372,7 +375,8 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
 
     if (paso2 != true || !context.mounted) return;
 
-    await FirestoreService.instance.limpiarDatosPrueba();
+    await CicloAutoResetService.ejecutarReset(
+        FirestoreService.instance.limpiarDatosPrueba);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -7,19 +7,51 @@ import 'local_cache_service.dart';
 /// corresponde a un día anterior y ejecuta el reinicio sin intervención
 /// del coordinador.
 ///
-/// También detecta cuando el cicloId cambió en Firestore (coordinador
-/// reinició desde otro dispositivo) y limpia el caché local IndexedDB
-/// para que todos los dispositivos vean datos frescos.
+/// También detecta cuando el cicloId cambió en Firestore porque otro
+/// dispositivo reinició el ciclo, y limpia el IndexedDB local para que
+/// todos los dispositivos trabajen con datos frescos.
 ///
 /// Inicializar con [start()] después de Firebase.initializeApp().
 class CicloAutoResetService {
   static StreamSubscription<CicloConfig>? _sub;
 
   /// Fecha (año-mes-día) en que ya se ejecutó el auto-reset en esta sesión.
-  /// Previene que el listener dispare el reset más de una vez por día,
-  /// incluso si el stream emite varios eventos antes de que Firestore
-  /// confirme el serverTimestamp.
   static DateTime? _resetFecha;
+
+  /// True mientras ESTE dispositivo está en medio de un resetCiclo().
+  /// Durante ese lapso ignoramos el cambio de cicloId en el stream para
+  /// no tratar nuestro propio reset como un "cambio externo".
+  static bool _reseteandoDesdeEsteDispositivo = false;
+
+  // ── API pública ───────────────────────────────────────────────────────────
+
+  /// Ejecuta [fn] protegido: borra el cicloId guardado y activa el flag
+  /// para que ningún evento del stream dispare una limpieza de caché
+  /// durante el reset.
+  ///
+  /// Usar siempre que ESTE dispositivo vaya a llamar resetCiclo() o
+  /// resetCicloConRemanente(), ya sea por auto-reset o por acción manual
+  /// del coordinador.
+  ///
+  /// Ejemplo:
+  /// ```dart
+  /// await CicloAutoResetService.ejecutarReset(
+  ///   () => FirestoreService.instance.resetCiclo(),
+  /// );
+  /// ```
+  static Future<T> ejecutarReset<T>(Future<T> Function() fn) async {
+    _reseteandoDesdeEsteDispositivo = true;
+    // Al borrar el cicloId guardado, el nuevo cicloId que genere el reset
+    // llegará con storedCicloId vacío → cicloIdCambio() devolverá false.
+    LocalCacheService.borrarCicloIdGuardado();
+    try {
+      return await fn();
+    } finally {
+      // El stream puede dispararse durante el await (Dart event-loop).
+      // Dejamos el flag en false solo cuando ya terminó el reset.
+      _reseteandoDesdeEsteDispositivo = false;
+    }
+  }
 
   /// Lanza el listener. Llamar una sola vez en main().
   static void start() {
@@ -27,18 +59,17 @@ class CicloAutoResetService {
     _sub = FirestoreService.instance
         .cicloConfigStream()
         .listen((ciclo) async {
-      // Ignorar el estado inicial (cicloId vacío = nunca se configuró).
       if (ciclo.cicloId.isEmpty) return;
 
-      // ── Detección de cambio de ciclo desde otro dispositivo ──────────────
-      // Si el coordinador reinició el ciclo (o limpió datos de prueba) desde
-      // otro dispositivo, el cicloId de Firestore será distinto al guardado
-      // en localStorage. En ese caso limpiamos el IndexedDB y recargamos para
-      // que este dispositivo trabaje con datos frescos.
-      if (LocalCacheService.cicloIdCambio(ciclo.cicloId)) {
+      // ── Detección de cambio de ciclo desde OTRO dispositivo ──────────────
+      // Ignorar si ESTE dispositivo está ejecutando el reset (el flag
+      // _reseteandoDesdeEsteDispositivo lo indica) o si el storedCicloId
+      // quedó vacío porque borramos antes del reset propio.
+      if (!_reseteandoDesdeEsteDispositivo &&
+          LocalCacheService.cicloIdCambio(ciclo.cicloId)) {
         LocalCacheService.guardarCicloId(ciclo.cicloId);
         await LocalCacheService.limpiarCacheYRecargar();
-        return; // La página se recargará; el código de abajo no se ejecuta.
+        return; // La página se recargará.
       }
       LocalCacheService.guardarCicloId(ciclo.cicloId);
 
@@ -46,7 +77,6 @@ class CicloAutoResetService {
       final hoy = DateTime.now();
       final hoyFecha = DateTime(hoy.year, hoy.month, hoy.day);
 
-      // Protección adicional: si ya reseteamos hoy en esta sesión, salir.
       if (_resetFecha == hoyFecha) return;
 
       final esDeHoy = ciclo.inicio.year == hoy.year &&
@@ -54,15 +84,13 @@ class CicloAutoResetService {
           ciclo.inicio.day == hoy.day;
 
       if (!esDeHoy) {
-        // Marcar ANTES del await para bloquear re-entrada si el stream
-        // emitiera otro evento durante la escritura en Firestore.
         _resetFecha = hoyFecha;
-        await FirestoreService.instance.resetCiclo();
+        await ejecutarReset(FirestoreService.instance.resetCiclo);
       }
     });
   }
 
-  /// Cancela el listener (útil en tests o si se quiere deshabilitar).
+  /// Cancela el listener.
   static void stop() {
     _sub?.cancel();
     _sub = null;

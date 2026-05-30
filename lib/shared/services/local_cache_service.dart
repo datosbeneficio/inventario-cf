@@ -23,6 +23,14 @@ class LocalCacheService {
     html.window.localStorage[_kCicloIdKey] = cicloId;
   }
 
+  /// Elimina el cicloId guardado localmente.
+  /// Llamar ANTES de iniciar un reset desde este dispositivo para que
+  /// el nuevo cicloId no sea interpretado como un cambio externo.
+  static void borrarCicloIdGuardado() {
+    if (!kIsWeb) return;
+    html.window.localStorage.remove(_kCicloIdKey);
+  }
+
   /// Retorna true si el dispositivo tiene almacenado un cicloId distinto al
   /// que acaba de llegar de Firestore (señal de que el coordinador reinició
   /// el ciclo desde otro dispositivo mientras este estaba conectado).
