@@ -12,6 +12,7 @@ import '../../models/salida.dart';
 import '../../widgets/consolidado_panel.dart';
 import 'clientes_screen.dart';
 import 'empresa_config_screen.dart';
+import 'despachos_dashboard_screen.dart';
 import 'reporte_totales_screen.dart';
 import 'reporte_rendimiento_screen.dart';
 
@@ -34,6 +35,10 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
         label: 'Consolidado',
         icon: Icons.analytics,
         title: 'Inventario Consolidado'),
+    _TabInfo(
+        label: 'Despachos',
+        icon: Icons.local_shipping,
+        title: 'Despachos'),
     _TabInfo(
         label: 'Totales',
         icon: Icons.bar_chart,
@@ -86,6 +91,7 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
         children: const [
           ClientesScreen(),
           ConsolidadoPanel(),
+          DespachosDashboardScreen(),
           ReporteTotalesScreen(),
           ReporteRendimientoScreen(),
         ],
