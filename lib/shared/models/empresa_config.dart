@@ -15,6 +15,10 @@ class EmpresaConfig {
   /// Cada despacho con líneas especiales toma este valor y lo incrementa.
   final int loteEspecialConsecutivo;
 
+  /// Días de vida útil para calcular el vencimiento del lote especial.
+  /// vencimientoEspecial = fechaDespacho + diasVencimientoEspecial.
+  final int diasVencimientoEspecial;
+
   const EmpresaConfig({
     required this.nombre,
     required this.subtitulo,
@@ -23,6 +27,7 @@ class EmpresaConfig {
     required this.contacto,
     this.codigoEliminacion = '',
     this.loteEspecialConsecutivo = 1,
+    this.diasVencimientoEspecial = 30,
   });
 
   factory EmpresaConfig.empty() => const EmpresaConfig(
@@ -44,6 +49,7 @@ class EmpresaConfig {
       contacto: d['contacto'] ?? '',
       codigoEliminacion: d['codigoEliminacion'] ?? 'huevos',
       loteEspecialConsecutivo: d['loteEspecialConsecutivo'] ?? 1,
+      diasVencimientoEspecial: d['diasVencimientoEspecial'] ?? 30,
     );
   }
 
@@ -55,5 +61,6 @@ class EmpresaConfig {
         'contacto': contacto.trim(),
         'codigoEliminacion': codigoEliminacion.trim(),
         'loteEspecialConsecutivo': loteEspecialConsecutivo,
+        'diasVencimientoEspecial': diasVencimientoEspecial,
       };
 }

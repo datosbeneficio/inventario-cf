@@ -19,6 +19,7 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
   late final TextEditingController _contactoCtrl;
   late final TextEditingController _codigoCtrl;
   late final TextEditingController _loteEspCtrl;
+  late final TextEditingController _diasVencEspCtrl;
   bool _saving = false;
   bool _obscureCodigo = true;
 
@@ -34,6 +35,8 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
     _codigoCtrl = TextEditingController(text: cfg.codigoEliminacion);
     _loteEspCtrl = TextEditingController(
         text: cfg.loteEspecialConsecutivo.toString());
+    _diasVencEspCtrl = TextEditingController(
+        text: cfg.diasVencimientoEspecial.toString());
   }
 
   @override
@@ -45,6 +48,7 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
     _contactoCtrl.dispose();
     _codigoCtrl.dispose();
     _loteEspCtrl.dispose();
+    _diasVencEspCtrl.dispose();
     super.dispose();
   }
 
@@ -61,6 +65,8 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
         codigoEliminacion: _codigoCtrl.text.trim(),
         loteEspecialConsecutivo:
             int.tryParse(_loteEspCtrl.text.trim()) ?? 1,
+        diasVencimientoEspecial:
+            int.tryParse(_diasVencEspCtrl.text.trim()) ?? 30,
       ),
     );
     if (mounted) {
@@ -177,20 +183,45 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
                 style: TextStyle(color: Colors.black54, fontSize: 12),
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _loteEspCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Consecutivo actual *',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.star_outline),
-                  hintText: 'Ej: 1',
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Campo requerido';
-                  if (int.tryParse(v.trim()) == null) return 'Debe ser un número';
-                  return null;
-                },
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _loteEspCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Consecutivo actual *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.star_outline),
+                        hintText: 'Ej: 1',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Requerido';
+                        if (int.tryParse(v.trim()) == null) return 'Número';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _diasVencEspCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Días de vencimiento *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.timer_outlined),
+                        hintText: 'Ej: 30',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Requerido';
+                        final n = int.tryParse(v.trim());
+                        if (n == null || n <= 0) return 'Inválido';
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               const Divider(),

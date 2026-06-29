@@ -57,6 +57,10 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   // ── Foto del precinto ────────────────────────────────────────────────────
   Uint8List? _fotoBytes;
 
+  // ── Cliente del despacho ─────────────────────────────────────────────────
+  String? _clienteId;
+  String _clienteNombre = '';
+
   // ── Líneas de producto ───────────────────────────────────────────────────
   final List<DespachoLinea> _lineas = [];
 
@@ -149,6 +153,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       _vencimientoMenudencias = null;
       _mostrarErrorVenc = false;
       _fotoBytes = null;
+      _clienteId = null;
+      _clienteNombre = '';
       _lineas.clear();
       _descartes.clear();
       _submitting = false;
@@ -280,10 +286,13 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       // ── Lote especial auto-incremental ─────────────────────────────────
       final tieneEspeciales = _lineas.any((l) => l.esEspecial);
       String loteEspecial = '';
+      DateTime? vencEspecial;
       if (tieneEspeciales) {
         final empresa = context.read<EmpresaConfig>();
         final consecutivo = empresa.loteEspecialConsecutivo;
         loteEspecial = consecutivo.toString();
+        vencEspecial = _fechaDespacho
+            .add(Duration(days: empresa.diasVencimientoEspecial));
         await FirestoreService.instance.updateEmpresaField(
             'loteEspecialConsecutivo', consecutivo + 1);
       }
@@ -316,6 +325,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         loteMenudencias: _loteMenudCtrl.text.trim(),
         vencimientoMenudencias: _vencimientoMenudencias,
         loteEspecial: loteEspecial,
+        vencimientoEspecial: vencEspecial,
         observaciones: _obsCtrl.text.trim(),
         lineas: _lineas,
         descartes: _descartes,
@@ -778,6 +788,49 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                     ),
                     const SizedBox(height: 20),
 
+                    // ── Cliente del despacho ──────────────────────────
+                    _SectionTitle(
+                        icon: Icons.business, label: 'Cliente'),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Cliente a despachar',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.business),
+                      ),
+                      value: context.watch<List<Cliente>>().any(
+                                  (c) => c.id == _clienteId)
+                              ? _clienteId
+                              : null,
+                      items: context.watch<List<Cliente>>()
+                          .map((c) => DropdownMenuItem(
+                              value: c.id, child: Text(c.nombre)))
+                          .toList(),
+                      onChanged: _lineas.isEmpty
+                          ? (v) {
+                              final cliente = context
+                                  .read<List<Cliente>>()
+                                  .firstWhere((c) => c.id == v);
+                              setState(() {
+                                _clienteId = v;
+                                _clienteNombre = cliente.nombre;
+                              });
+                            }
+                          : null,
+                      validator: (v) =>
+                          v == null ? 'Selecciona el cliente' : null,
+                    ),
+                    if (_lineas.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, left: 4),
+                        child: Text(
+                          'Elimina las líneas para cambiar de cliente',
+                          style: TextStyle(
+                              fontSize: 11, color: cs.onSurfaceVariant),
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+
                     // ── Sección 4: Líneas de producto ──────────────────
                     _SectionTitle(
                         icon: Icons.list_alt, label: 'Líneas de producto'),
@@ -1038,7 +1091,10 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   // ── Dialog para agregar una línea ─────────────────────────────────────────
 
   void _showAgregarLineaDialog(BuildContext context) {
-    final clientes = context.read<List<Cliente>>();
+    if (_clienteId == null) {
+      _showError('Primero selecciona el cliente del despacho');
+      return;
+    }
     final ciclo = context.read<CicloConfig>();
     // Solo movimientos del ciclo activo
     final ingresos = context
@@ -1092,7 +1148,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     showDialog(
       context: context,
       builder: (ctx) => _AgregarLineaDialog(
-        clientes: clientes,
+        clienteId: _clienteId!,
+        clienteNombre: _clienteNombre,
         saldoMap: saldoNuevoMap,
         saldoRemaneMap: saldoRemaneMap,
         onAgregar: (linea) => setState(() {
@@ -1308,7 +1365,8 @@ class _PrecintoFotoWidget extends StatelessWidget {
 // ── Dialog para seleccionar cliente, rango y cantidades ──────────────────────
 
 class _AgregarLineaDialog extends StatefulWidget {
-  final List<Cliente> clientes;
+  final String clienteId;
+  final String clienteNombre;
   /// Stock del día actual (ingresos no-remanente − salidas no-remanente)
   final Map<String, ({int canastillas, int unidades, double peso})> saldoMap;
   /// Stock remanente del día anterior
@@ -1316,7 +1374,8 @@ class _AgregarLineaDialog extends StatefulWidget {
   final void Function(DespachoLinea) onAgregar;
 
   const _AgregarLineaDialog({
-    required this.clientes,
+    required this.clienteId,
+    required this.clienteNombre,
     required this.saldoMap,
     required this.saldoRemaneMap,
     required this.onAgregar,
@@ -1327,7 +1386,6 @@ class _AgregarLineaDialog extends StatefulWidget {
 }
 
 class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
-  String? _clienteId;
   Rango? _rango;
   final _canCtrl = TextEditingController();
   final _pesoCtrl = TextEditingController();
@@ -1343,8 +1401,8 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
       .any((s) => s.canastillas > 0 || s.unidades > 0);
 
   ({int canastillas, int unidades, double peso})? get _saldo {
-    if (_clienteId == null || _rango == null) return null;
-    return _mapaActivo['$_clienteId|${_rango!.id}'];
+    if (_rango == null) return null;
+    return _mapaActivo['${widget.clienteId}|${_rango!.id}'];
   }
 
   int get _canastillas => int.tryParse(_canCtrl.text) ?? 0;
@@ -1404,35 +1462,23 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                   const SizedBox(height: 12),
                 ],
 
-                // ── Cliente ─────────────────────────────────────────────────
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Cliente',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.business),
-                  ),
-                  initialValue: _clienteId,
-                  items: widget.clientes
-                      .map((c) => DropdownMenuItem(
-                          value: c.id, child: Text(c.nombre)))
-                      .toList(),
-                  onChanged: (v) => setState(() {
-                    _clienteId = v;
-                    _rango = null;
-                  }),
-                  validator: (v) =>
-                      v == null ? 'Selecciona un cliente' : null,
+                // ── Cliente (informativo) ──────────────────────────────────
+                Chip(
+                  avatar: Icon(Icons.business, size: 16, color: cs.primary),
+                  label: Text(widget.clienteNombre,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  backgroundColor: cs.primaryContainer,
+                  side: BorderSide.none,
                 ),
                 const SizedBox(height: 12),
 
                 // ── Rango (filtrado por mapa activo) ─────────────────────────
-                if (_clienteId != null)
-                  StreamBuilder<List<Rango>>(
+                StreamBuilder<List<Rango>>(
                     stream: FirestoreService.instance
-                        .rangosStream(_clienteId!)
+                        .rangosStream(widget.clienteId)
                         .map((rs) => rs.where((r) {
                               final s = _mapaActivo[
-                                  '$_clienteId|${r.id}'];
+                                  '${widget.clienteId}|${r.id}'];
                               return s != null &&
                                   (s.canastillas > 0 || s.unidades > 0);
                             }).toList()),
@@ -1637,10 +1683,8 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                       _pesoCtrl.text.replaceAll(',', '.'));
                   widget.onAgregar(
                     DespachoLinea(
-                      clienteId: _clienteId!,
-                      clienteNombre: widget.clientes
-                          .firstWhere((c) => c.id == _clienteId)
-                          .nombre,
+                      clienteId: widget.clienteId,
+                      clienteNombre: widget.clienteNombre,
                       rangoId: _rango!.id,
                       rangoNombre: _rango!.nombre,
                       rangoTipo: _rango!.tipo,
