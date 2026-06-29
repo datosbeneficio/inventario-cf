@@ -18,6 +18,7 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
   late final TextEditingController _nitCtrl;
   late final TextEditingController _contactoCtrl;
   late final TextEditingController _codigoCtrl;
+  late final TextEditingController _loteEspCtrl;
   bool _saving = false;
   bool _obscureCodigo = true;
 
@@ -31,6 +32,8 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
     _nitCtrl = TextEditingController(text: cfg.nit);
     _contactoCtrl = TextEditingController(text: cfg.contacto);
     _codigoCtrl = TextEditingController(text: cfg.codigoEliminacion);
+    _loteEspCtrl = TextEditingController(
+        text: cfg.loteEspecialConsecutivo.toString());
   }
 
   @override
@@ -41,6 +44,7 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
     _nitCtrl.dispose();
     _contactoCtrl.dispose();
     _codigoCtrl.dispose();
+    _loteEspCtrl.dispose();
     super.dispose();
   }
 
@@ -55,6 +59,8 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
         nit: _nitCtrl.text.trim(),
         contacto: _contactoCtrl.text.trim(),
         codigoEliminacion: _codigoCtrl.text.trim(),
+        loteEspecialConsecutivo:
+            int.tryParse(_loteEspCtrl.text.trim()) ?? 1,
       ),
     );
     if (mounted) {
@@ -155,6 +161,36 @@ class _EmpresaConfigScreenState extends State<EmpresaConfigScreen> {
                   prefixIcon: Icon(Icons.phone_outlined),
                   hintText: 'Ej: 314 456 7890',
                 ),
+              ),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 12),
+              const Text(
+                'Lote especial',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Consecutivo base para el lote de rangos especiales. '
+                'Se asigna automáticamente al crear un despacho con producto especial '
+                'y se incrementa después de cada uso.',
+                style: TextStyle(color: Colors.black54, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _loteEspCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Consecutivo actual *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.star_outline),
+                  hintText: 'Ej: 1',
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Campo requerido';
+                  if (int.tryParse(v.trim()) == null) return 'Debe ser un número';
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
               const Divider(),

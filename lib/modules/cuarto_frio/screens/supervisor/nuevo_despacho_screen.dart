@@ -277,6 +277,17 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     try {
       final despachoId = FirestoreService.instance.newDespachoId();
 
+      // ── Lote especial auto-incremental ─────────────────────────────────
+      final tieneEspeciales = _lineas.any((l) => l.esEspecial);
+      String loteEspecial = '';
+      if (tieneEspeciales) {
+        final empresa = context.read<EmpresaConfig>();
+        final consecutivo = empresa.loteEspecialConsecutivo;
+        loteEspecial = consecutivo.toString();
+        await FirestoreService.instance.updateEmpresaField(
+            'loteEspecialConsecutivo', consecutivo + 1);
+      }
+
       final despacho = Despacho(
         id: despachoId,
         guiaNro: _guiaCtrl.text.trim(),
@@ -304,6 +315,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         vencimientoPollo: _vencimientoPollo,
         loteMenudencias: _loteMenudCtrl.text.trim(),
         vencimientoMenudencias: _vencimientoMenudencias,
+        loteEspecial: loteEspecial,
         observaciones: _obsCtrl.text.trim(),
         lineas: _lineas,
         descartes: _descartes,
@@ -1084,12 +1096,12 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         saldoMap: saldoNuevoMap,
         saldoRemaneMap: saldoRemaneMap,
         onAgregar: (linea) => setState(() {
-          // Acumular en la línea existente si coincide cliente + rango + esCola + esRemanente
           final idx = _lineas.indexWhere((l) =>
               l.clienteId == linea.clienteId &&
               l.rangoId == linea.rangoId &&
               l.esCola == linea.esCola &&
-              l.esRemanente == linea.esRemanente);
+              l.esRemanente == linea.esRemanente &&
+              l.esEspecial == linea.esEspecial);
           if (idx >= 0) {
             final e = _lineas[idx];
             _lineas[idx] = DespachoLinea(
@@ -1103,6 +1115,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
               peso: e.peso + linea.peso,
               esCola: e.esCola,
               esRemanente: e.esRemanente,
+              esEspecial: e.esEspecial,
             );
           } else {
             _lineas.add(linea);
@@ -1636,6 +1649,7 @@ class _AgregarLineaDialogState extends State<_AgregarLineaDialog> {
                       peso: peso,
                       esCola: _esCola,
                       esRemanente: _esRemanente,
+                      esEspecial: _rango!.esEspecial,
                     ),
                   );
                   Navigator.pop(context);

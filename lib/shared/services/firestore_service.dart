@@ -404,6 +404,9 @@ class FirestoreService {
   Future<void> updateEmpresaConfig(EmpresaConfig config) =>
       _db.collection('config').doc('empresa').set(config.toMap());
 
+  Future<void> updateEmpresaField(String field, dynamic value) =>
+      _db.collection('config').doc('empresa').update({field: value});
+
   // ── Ciclo de producción ───────────────────────────────────────────────────
 
   Stream<CicloConfig> cicloConfigStream() => _db
