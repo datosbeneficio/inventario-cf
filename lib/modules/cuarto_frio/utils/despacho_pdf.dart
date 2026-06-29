@@ -33,7 +33,13 @@ Future<pw.Document> buildDespachoPdf(
           pw.SizedBox(height: 6),
           _infoGrid(d),
           pw.SizedBox(height: 10),
-          _lineasTable(d),
+          _lineasTable(d, esEspecial: false),
+          if (d.lineas.any((l) => l.esEspecial)) ...[
+            pw.SizedBox(height: 10),
+            _especialHeader(d),
+            pw.SizedBox(height: 4),
+            _lineasTable(d, esEspecial: true),
+          ],
           if (d.descartes.isNotEmpty) ...[
             pw.SizedBox(height: 10),
             _descartesSection(d.descartes),
@@ -152,6 +158,9 @@ pw.Widget _infoGrid(Despacho d) {
     ['CC / PLANCHA:', '${d.conductorCedula} / ${d.plancha}', '', ''],
     ['LOTE POLLO EN CANAL:', d.lotePollo, 'VENCE POLLO:', vencPollo],
     ['LOTE MENUDENCIAS:', d.loteMenudencias, 'VENCE MENUDENCIAS:', vencMenud],
+    if (d.loteEspecial.isNotEmpty)
+      ['LOTE ESPECIAL:', d.loteEspecial, 'VENCE ESPECIAL:',
+       d.vencimientoEspecial != null ? formatDate(d.vencimientoEspecial!) : ''],
   ];
 
   const labelStyle = pw.TextStyle(fontSize: 8);
@@ -183,12 +192,30 @@ pw.Widget _cell(String text, pw.TextStyle style) => pw.Container(
 
 // ── Tabla de líneas de producto ─────────────────────────────────────────────
 
-pw.Widget _lineasTable(Despacho d) {
+pw.Widget _especialHeader(Despacho d) {
+  final boldSm = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
+  return pw.Container(
+    width: double.infinity,
+    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+    decoration: const pw.BoxDecoration(
+      color: PdfColors.red100,
+      border: pw.Border.fromBorderSide(pw.BorderSide(width: 0.5)),
+    ),
+    child: pw.Text('PRODUCTO ESPECIAL', style: boldSm),
+  );
+}
+
+pw.Widget _lineasTable(Despacho d, {required bool esEspecial}) {
   final headerStyle =
       pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8);
   final cellStyle = const pw.TextStyle(fontSize: 8);
   final totalStyle =
       pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
+
+  final lineas = d.lineas.where((l) => l.esEspecial == esEspecial).toList();
+  final totCan = lineas.fold(0, (s, l) => s + l.canastillas);
+  final totUnid = lineas.fold(0, (s, l) => s + l.unidades);
+  final totPeso = lineas.fold(0.0, (s, l) => s + l.peso);
 
   return pw.Table(
     border: pw.TableBorder.all(width: 0.5),
@@ -200,9 +227,10 @@ pw.Widget _lineasTable(Despacho d) {
       4: pw.FlexColumnWidth(1.4),
     },
     children: [
-      // Encabezado
       pw.TableRow(
-        decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+        decoration: pw.BoxDecoration(
+          color: esEspecial ? PdfColors.red50 : PdfColors.grey200,
+        ),
         children: [
           _cell('CLIENTE', headerStyle),
           _cell('RANGO', headerStyle),
@@ -211,12 +239,10 @@ pw.Widget _lineasTable(Despacho d) {
           _cell('PESO NETO', headerStyle),
         ],
       ),
-      // Filas de datos
-      ...d.lineas.map((l) {
+      ...lineas.map((l) {
         final esAves = l.rangoTipo == kTipoAves && l.unidades > 0;
         return pw.TableRow(children: [
           _cell(l.clienteNombre, cellStyle),
-          // Celda de rango: añadir etiqueta "DÍA ANT." para remanente
           l.esRemanente
               ? pw.Container(
                   padding: const pw.EdgeInsets.symmetric(
@@ -260,15 +286,16 @@ pw.Widget _lineasTable(Despacho d) {
               : _cell(formatKg(l.peso), cellStyle),
         ]);
       }),
-      // Fila de totales
       pw.TableRow(
-        decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+        decoration: pw.BoxDecoration(
+          color: esEspecial ? PdfColors.red50 : PdfColors.grey100,
+        ),
         children: [
-          _cell('TOTAL', totalStyle),
+          _cell('TOTAL${esEspecial ? ' ESPECIAL' : ''}', totalStyle),
           _cell('', totalStyle),
-          _cell(formatNum(d.totalCanastillas), totalStyle),
-          _cell(formatNum(d.totalUnidades), totalStyle),
-          _cell(formatKg(d.totalPeso), totalStyle),
+          _cell(formatNum(totCan), totalStyle),
+          _cell(formatNum(totUnid), totalStyle),
+          _cell(formatKg(totPeso), totalStyle),
         ],
       ),
     ],

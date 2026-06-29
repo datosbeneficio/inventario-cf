@@ -41,6 +41,8 @@ class DespachoLinea {
   final bool esCola;
   /// true si esta línea corresponde a producto remanente del día anterior.
   final bool esRemanente;
+  /// true si el rango fue marcado como "especial" por el coordinador.
+  final bool esEspecial;
 
   const DespachoLinea({
     required this.clienteId,
@@ -53,6 +55,7 @@ class DespachoLinea {
     required this.peso,
     required this.esCola,
     this.esRemanente = false,
+    this.esEspecial = false,
   });
 
   factory DespachoLinea.fromMap(Map<String, dynamic> m) => DespachoLinea(
@@ -66,6 +69,7 @@ class DespachoLinea {
         peso: (m['peso'] ?? 0.0).toDouble(),
         esCola: m['esCola'] ?? false,
         esRemanente: m['esRemanente'] ?? false,
+        esEspecial: m['esEspecial'] ?? false,
       );
 
   Map<String, dynamic> toMap() => {
@@ -79,6 +83,7 @@ class DespachoLinea {
         'peso': peso,
         'esCola': esCola,
         if (esRemanente) 'esRemanente': true,
+        if (esEspecial) 'esEspecial': true,
       };
 
   /// Serializa esta línea como documento de `salidas` (con despachoId y creadoPor inyectados).
@@ -118,6 +123,8 @@ class Despacho {
   final DateTime? vencimientoPollo;
   final String loteMenudencias;
   final DateTime? vencimientoMenudencias;
+  final String loteEspecial;
+  final DateTime? vencimientoEspecial;
   final List<DespachoLinea> lineas;
   /// Descartes registrados en este despacho (puede estar vacío).
   final List<DespachoDescarte> descartes;
@@ -153,6 +160,8 @@ class Despacho {
     this.vencimientoPollo,
     this.loteMenudencias = '',
     this.vencimientoMenudencias,
+    this.loteEspecial = '',
+    this.vencimientoEspecial,
     // Nota: en el formulario estos campos son obligatorios (INVIMA).
     // Los defaults vacíos/null solo aplican a documentos históricos.
     required this.lineas,
@@ -200,6 +209,10 @@ class Despacho {
       vencimientoMenudencias: d['vencimientoMenudencias'] != null
           ? (d['vencimientoMenudencias'] as Timestamp).toDate()
           : null,
+      loteEspecial: d['loteEspecial'] ?? '',
+      vencimientoEspecial: d['vencimientoEspecial'] != null
+          ? (d['vencimientoEspecial'] as Timestamp).toDate()
+          : null,
       lineas: lineasRaw
           .map((l) => DespachoLinea.fromMap(l as Map<String, dynamic>))
           .toList(),
@@ -242,6 +255,9 @@ class Despacho {
         'loteMenudencias': loteMenudencias,
         if (vencimientoMenudencias != null)
           'vencimientoMenudencias': Timestamp.fromDate(vencimientoMenudencias!),
+        if (loteEspecial.isNotEmpty) 'loteEspecial': loteEspecial,
+        if (vencimientoEspecial != null)
+          'vencimientoEspecial': Timestamp.fromDate(vencimientoEspecial!),
         'lineas': lineas.map((l) => l.toMap()).toList(),
         if (descartes.isNotEmpty)
           'descartes': descartes.map((d) => d.toMap()).toList(),

@@ -76,6 +76,7 @@ class FirestoreService {
     String tipo, {
     String subtipo = 'canastillas',
     String? descripcion,
+    bool esEspecial = false,
   }) =>
       _db
           .collection(_colClientes)
@@ -89,8 +90,18 @@ class FirestoreService {
         'tipo': tipo,
         'subtipo': subtipo,
         'activo': true,
+        if (esEspecial) 'esEspecial': true,
         'creadoEn': FieldValue.serverTimestamp(),
       });
+
+  Future<void> updateRango(
+          String clienteId, String rangoId, Map<String, dynamic> data) =>
+      _db
+          .collection(_colClientes)
+          .doc(clienteId)
+          .collection('rangos')
+          .doc(rangoId)
+          .update(data);
 
   Future<void> deleteRango(String clienteId, String rangoId) => _db
       .collection(_colClientes)

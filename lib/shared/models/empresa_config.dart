@@ -11,6 +11,10 @@ class EmpresaConfig {
   /// Si está vacío, el botón de guard no se muestra (feature desactivada).
   final String codigoEliminacion;
 
+  /// Consecutivo actual para lotes de rangos especiales.
+  /// Cada despacho con líneas especiales toma este valor y lo incrementa.
+  final int loteEspecialConsecutivo;
+
   const EmpresaConfig({
     required this.nombre,
     required this.subtitulo,
@@ -18,6 +22,7 @@ class EmpresaConfig {
     required this.nit,
     required this.contacto,
     this.codigoEliminacion = '',
+    this.loteEspecialConsecutivo = 1,
   });
 
   factory EmpresaConfig.empty() => const EmpresaConfig(
@@ -38,6 +43,7 @@ class EmpresaConfig {
       nit: d['nit'] ?? '',
       contacto: d['contacto'] ?? '',
       codigoEliminacion: d['codigoEliminacion'] ?? 'huevos',
+      loteEspecialConsecutivo: d['loteEspecialConsecutivo'] ?? 1,
     );
   }
 
@@ -48,5 +54,6 @@ class EmpresaConfig {
         'nit': nit.trim(),
         'contacto': contacto.trim(),
         'codigoEliminacion': codigoEliminacion.trim(),
+        'loteEspecialConsecutivo': loteEspecialConsecutivo,
       };
 }

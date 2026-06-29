@@ -10,6 +10,7 @@ class Rango {
   final String tipo;
   final String subtipo;
   final bool activo;
+  final bool esEspecial;
 
   const Rango({
     required this.id,
@@ -20,6 +21,7 @@ class Rango {
     required this.tipo,
     required this.subtipo,
     required this.activo,
+    this.esEspecial = false,
   });
 
   bool get esAves => tipo == kTipoAves;
@@ -40,6 +42,7 @@ class Rango {
       tipo: d['tipo'] ?? kTipoAves,
       subtipo: d['subtipo'] ?? kSubtipoCanastillas,
       activo: d['activo'] ?? true,
+      esEspecial: d['esEspecial'] ?? false,
     );
   }
 }

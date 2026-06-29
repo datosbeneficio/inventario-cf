@@ -370,19 +370,47 @@ class _RangoTile extends StatelessWidget {
           const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
       leading: CircleAvatar(
         radius: 18,
-        backgroundColor:
-            esAves ? cs.primaryContainer : cs.tertiaryContainer,
+        backgroundColor: rango.esEspecial
+            ? cs.errorContainer
+            : esAves
+                ? cs.primaryContainer
+                : cs.tertiaryContainer,
         child: Icon(
-          esAves
-              ? Icons.set_meal
-              : rango.esPaquetes
-                  ? Icons.inventory_2
-                  : Icons.restaurant,
+          rango.esEspecial
+              ? Icons.star
+              : esAves
+                  ? Icons.set_meal
+                  : rango.esPaquetes
+                      ? Icons.inventory_2
+                      : Icons.restaurant,
           size: 16,
-          color: esAves ? cs.onPrimaryContainer : cs.onTertiaryContainer,
+          color: rango.esEspecial
+              ? cs.onErrorContainer
+              : esAves
+                  ? cs.onPrimaryContainer
+                  : cs.onTertiaryContainer,
         ),
       ),
-      title: Text(rango.nombre),
+      title: Row(
+        children: [
+          Text(rango.nombre),
+          if (rango.esEspecial) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: cs.error,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text('ESPECIAL',
+                  style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: cs.onError)),
+            ),
+          ],
+        ],
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -395,15 +423,38 @@ class _RangoTile extends StatelessWidget {
         ],
       ),
       isThreeLine: rango.descripcion != null && rango.descripcion!.isNotEmpty,
-      trailing: IconButton(
-        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-        tooltip: 'Eliminar rango',
-        onPressed: () async {
-          final ok = await showConfirmDelete(context, rango.nombre);
-          if (ok && context.mounted) {
-            FirestoreService.instance.deleteRango(clienteId, rango.id);
-          }
-        },
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: Icon(
+              rango.esEspecial ? Icons.star : Icons.star_border,
+              color: rango.esEspecial ? cs.error : cs.outlineVariant,
+              size: 20,
+            ),
+            tooltip: rango.esEspecial
+                ? 'Quitar marca especial'
+                : 'Marcar como especial',
+            onPressed: () {
+              FirestoreService.instance.updateRango(
+                clienteId,
+                rango.id,
+                {'esEspecial': !rango.esEspecial},
+              );
+            },
+          ),
+          IconButton(
+            icon:
+                const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+            tooltip: 'Eliminar rango',
+            onPressed: () async {
+              final ok = await showConfirmDelete(context, rango.nombre);
+              if (ok && context.mounted) {
+                FirestoreService.instance.deleteRango(clienteId, rango.id);
+              }
+            },
+          ),
+        ],
       ),
     );
   }
