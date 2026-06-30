@@ -31,11 +31,13 @@ class AuthProvider extends ChangeNotifier {
   User? _user;
   String? _role;
   bool _loading = true;
+  String? _sessionError;
 
   String? get role => _role;
   bool get isLoggedIn => _user != null && _role != null;
   bool get isLoading => _loading;
   String? get uid => _user?.uid;
+  String? get sessionError => _sessionError;
 
   /// Nickname legible (la parte del email antes del @).
   String? get nickname {
@@ -50,6 +52,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _onAuthStateChanged(User? user) async {
     _user = user;
+    _sessionError = null;
     if (user != null) {
       try {
         final doc = await FirebaseFirestore.instance
@@ -57,8 +60,23 @@ class AuthProvider extends ChangeNotifier {
             .doc(user.uid)
             .get();
         _role = doc.data()?['rol'] as String?;
-      } catch (_) {
+        if (_role == null) {
+          _sessionError = 'Usuario sin rol asignado. Contacta al administrador.';
+          await FirebaseAuth.instance.signOut();
+          _user = null;
+        }
+      } catch (e) {
         _role = null;
+        _user = null;
+        final msg = e.toString();
+        if (msg.contains('PERMISSION_DENIED') || msg.contains('permission-denied')) {
+          _sessionError = 'Sin permiso para leer datos (reglas de Firestore). Contacta al administrador.';
+        } else if (msg.contains('unavailable') || msg.contains('network')) {
+          _sessionError = 'Sin conexión. Verifica tu internet e intenta de nuevo.';
+        } else {
+          _sessionError = 'Error al cargar el perfil: $e';
+        }
+        await FirebaseAuth.instance.signOut();
       }
     } else {
       _role = null;

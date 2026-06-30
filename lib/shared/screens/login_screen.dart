@@ -27,17 +27,19 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
-    final error = await context.read<AuthProvider>().login(
-          _nicknameController.text,
-          _passwordController.text,
-        );
+    final auth = context.read<AuthProvider>();
+    final error = await auth.login(
+      _nicknameController.text,
+      _passwordController.text,
+    );
 
     if (!mounted) return;
     setState(() => _loading = false);
 
-    if (error != null) {
+    final msg = error ?? auth.sessionError;
+    if (msg != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.red),
+        SnackBar(content: Text(msg), backgroundColor: Colors.red),
       );
     }
   }
