@@ -8,8 +8,13 @@ import '../../../shared/utils/formatters.dart';
 
 /// Panel de inventario consolidado: muestra ingresado, salido y saldo actual
 /// agrupado por tipo de producto → cliente → rango, para el ciclo activo.
+///
+/// [soloTipo] — si se especifica (kTipoAves o kTipoMenudencias), el panel
+/// solo muestra la sección de ese tipo (consolidado específico del rol).
 class ConsolidadoPanel extends StatelessWidget {
-  const ConsolidadoPanel({super.key});
+  final String? soloTipo;
+
+  const ConsolidadoPanel({super.key, this.soloTipo});
 
   @override
   Widget build(BuildContext context) {
@@ -17,10 +22,12 @@ class ConsolidadoPanel extends StatelessWidget {
     final ingresos = context
         .watch<List<Ingreso>>()
         .where((i) => !i.timestamp.isBefore(ciclo.inicio))
+        .where((i) => soloTipo == null || i.rangoTipo == soloTipo)
         .toList();
     final salidas = context
         .watch<List<Salida>>()
         .where((s) => !s.timestamp.isBefore(ciclo.inicio))
+        .where((s) => soloTipo == null || s.rangoTipo == soloTipo)
         .toList();
 
     // ── Construir filas consolidadas ────────────────────────────────────

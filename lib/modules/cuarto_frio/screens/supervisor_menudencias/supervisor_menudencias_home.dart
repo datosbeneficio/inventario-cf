@@ -103,8 +103,9 @@ class _SupervisorMenudenciasHomeState
             bloqueActual: _bloqueActual,
             onNuevoBloque: _nuevoBloque,
           ),
-          const HistorialIngresosPanel(rangoTipo: kTipoMenudencias),
-          const ConsolidadoPanel(),
+          const HistorialIngresosPanel(
+              rangoTipo: kTipoMenudencias, incluirHoy: true),
+          const ConsolidadoPanel(soloTipo: kTipoMenudencias),
         ],
       ),
       bottomNavigationBar: NavigationBar(

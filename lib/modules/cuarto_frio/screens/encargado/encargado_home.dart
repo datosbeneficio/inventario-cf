@@ -101,8 +101,8 @@ class _EncargadoHomeState extends State<EncargadoHome> {
             bloqueActual: _bloqueActual,
             onNuevoBloque: _nuevoBloque,
           ),
-          const HistorialIngresosPanel(rangoTipo: kTipoAves),
-          const ConsolidadoPanel(),
+          const HistorialIngresosPanel(rangoTipo: kTipoAves, incluirHoy: true),
+          const ConsolidadoPanel(soloTipo: kTipoAves),
         ],
       ),
       bottomNavigationBar: NavigationBar(

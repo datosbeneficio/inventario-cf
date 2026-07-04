@@ -30,6 +30,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   final _formKey = GlobalKey<FormState>();
 
   // ── Transporte ──────────────────────────────────────────────────────────
+  /// Fuerza el remount del campo de placa al reiniciar el formulario.
+  int _formResetKey = 0;
   Vehiculo? _vehiculo;
   Conductor? _conductor;
   final _capacidadCtrl = TextEditingController();
@@ -131,9 +133,34 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     _guiaCtrl.text = (maxNro + 1).toString();
   }
 
+  /// Al elegir un vehículo, autocompleta capacidad y busca el último
+  /// conductor conocido para esa placa (el supervisor puede cambiarlo).
+  void _seleccionarVehiculo(Vehiculo sel) {
+    final despachos = context.read<List<Despacho>>();
+    final conductores = context.read<List<Conductor>>();
+
+    Despacho? ultimo;
+    for (final d in despachos) {
+      if (d.vehiculoId != sel.id) continue;
+      if (ultimo == null || d.fechaDespacho.isAfter(ultimo.fechaDespacho)) {
+        ultimo = d;
+      }
+    }
+    final conductorPrevio = ultimo == null
+        ? null
+        : conductores.where((c) => c.id == ultimo!.conductorId).firstOrNull;
+
+    setState(() {
+      _vehiculo = sel;
+      _capacidadCtrl.text = formatNum(sel.capacidadKg);
+      if (conductorPrevio != null) _conductor = conductorPrevio;
+    });
+  }
+
   /// Limpia el formulario y prepara un nuevo despacho.
   void _resetForm() {
     setState(() {
+      _formResetKey++;
       _vehiculo = null;
       _conductor = null;
       _destino = null;
@@ -403,31 +430,78 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                         icon: Icons.local_shipping, label: 'Transporte'),
                     const SizedBox(height: 12),
 
-                    // ── Dropdown Vehículo ──────────────────────────────
-                    DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: 'Vehículo',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.directions_car),
-                      ),
+                    // ── Placa (autocompletar) ──────────────────────────
+                    FormField<String>(
+                      key: ValueKey(_formResetKey),
                       initialValue: _vehiculo?.id,
-                      items: vehiculos
-                          .map((v) => DropdownMenuItem(
-                                value: v.id,
-                                child: Text(v.placa),
-                              ))
-                          .toList(),
-                      onChanged: (id) {
-                        final sel =
-                            vehiculos.firstWhere((v) => v.id == id);
-                        setState(() {
-                          _vehiculo = sel;
-                          _capacidadCtrl.text =
-                              formatNum(sel.capacidadKg);
-                        });
-                      },
-                      validator: (v) =>
-                          v == null ? 'Selecciona un vehículo' : null,
+                      validator: (_) =>
+                          _vehiculo == null ? 'Selecciona un vehículo' : null,
+                      builder: (field) => Autocomplete<Vehiculo>(
+                        initialValue: TextEditingValue(
+                            text: _vehiculo?.placa ?? ''),
+                        displayStringForOption: (v) => v.placa,
+                        optionsBuilder: (value) {
+                          if (value.text.isEmpty) return vehiculos;
+                          final q = value.text.toUpperCase();
+                          return vehiculos
+                              .where((v) => v.placa.contains(q))
+                              .toList();
+                        },
+                        onSelected: (sel) {
+                          _seleccionarVehiculo(sel);
+                          field.didChange(sel.id);
+                        },
+                        fieldViewBuilder:
+                            (ctx, ctrl, focusNode, onSubmit) {
+                          // Si el usuario borra el texto, se limpia la selección.
+                          ctrl.addListener(() {
+                            if (ctrl.text.isEmpty && _vehiculo != null) {
+                              setState(() => _vehiculo = null);
+                              field.didChange(null);
+                            }
+                          });
+                          return TextFormField(
+                            controller: ctrl,
+                            focusNode: focusNode,
+                            textCapitalization:
+                                TextCapitalization.characters,
+                            decoration: InputDecoration(
+                              labelText: 'Placa del vehículo',
+                              border: const OutlineInputBorder(),
+                              prefixIcon:
+                                  const Icon(Icons.directions_car),
+                              errorText: field.errorText,
+                            ),
+                          );
+                        },
+                        optionsViewBuilder: (ctx, onSelected, options) =>
+                            Align(
+                          alignment: Alignment.topLeft,
+                          child: Material(
+                            elevation: 4,
+                            child: SizedBox(
+                              width: 320,
+                              child: ListView(
+                                shrinkWrap: true,
+                                padding: EdgeInsets.zero,
+                                children: options
+                                    .map((v) => ListTile(
+                                          dense: true,
+                                          leading: const Icon(
+                                              Icons.directions_car,
+                                              size: 18),
+                                          title: Text(v.placa),
+                                          subtitle: Text(
+                                              'Plancha ${v.plancha} · '
+                                              '${formatNum(v.capacidadKg)} kg'),
+                                          onTap: () => onSelected(v),
+                                        ))
+                                    .toList(),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
 
                     if (_vehiculo != null) ...[
