@@ -480,6 +480,10 @@ class _ListaIngresosState extends State<_ListaIngresos> {
                     peso: peso,
                     esCola: false,
                     unidades: unidades,
+                    clienteId: clienteId,
+                    clienteNombre: clienteNombre,
+                    rangoId: rangoId,
+                    rangoNombre: rangoNombre,
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },

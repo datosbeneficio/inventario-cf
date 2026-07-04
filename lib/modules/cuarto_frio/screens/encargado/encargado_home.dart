@@ -483,6 +483,10 @@ class _ListaIngresosState extends State<_ListaIngresos> {
                     esCola: esCola,
                     unidades: FirestoreService.calcularUnidades(
                         esCola, inputValue, multiplicador),
+                    clienteId: clienteId,
+                    clienteNombre: clienteNombre,
+                    rangoId: rangoId,
+                    rangoNombre: rangoNombre,
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                 },

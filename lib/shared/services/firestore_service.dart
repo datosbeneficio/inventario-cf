@@ -174,12 +174,20 @@ class FirestoreService {
     required double peso,
     required bool esCola,
     required int unidades,
+    String? clienteId,
+    String? clienteNombre,
+    String? rangoId,
+    String? rangoNombre,
   }) =>
       _db.collection(_colIngresos).doc(id).update({
         'canastillas': canastillas,
         'peso': peso,
         'esCola': esCola,
         'unidades': unidades,
+        if (clienteId != null) 'clienteId': clienteId,
+        if (clienteNombre != null) 'clienteNombre': clienteNombre,
+        if (rangoId != null) 'rangoId': rangoId,
+        if (rangoNombre != null) 'rangoNombre': rangoNombre,
       });
 
   Future<void> deleteIngreso(String id) =>

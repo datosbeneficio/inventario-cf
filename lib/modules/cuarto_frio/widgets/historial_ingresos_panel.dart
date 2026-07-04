@@ -522,6 +522,10 @@ class _BloqueSeccion extends StatelessWidget {
                           esCola: esCola,
                           unidades: FirestoreService.calcularUnidades(
                               esCola, inputValue, multiplicador),
+                          clienteId: clienteId,
+                          clienteNombre: clienteNombre,
+                          rangoId: rangoId,
+                          rangoNombre: rangoNombre,
                         );
                         if (ctx.mounted) Navigator.pop(ctx);
                       },
@@ -547,6 +551,10 @@ class _BloqueSeccion extends StatelessWidget {
                           peso: peso,
                           esCola: false,
                           unidades: unidades,
+                          clienteId: clienteId,
+                          clienteNombre: clienteNombre,
+                          rangoId: rangoId,
+                          rangoNombre: rangoNombre,
                         );
                         if (ctx.mounted) Navigator.pop(ctx);
                       },
