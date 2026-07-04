@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
@@ -17,6 +18,16 @@ class FirestoreService {
   FirestoreService._();
 
   final _db = FirebaseFirestore.instance;
+
+  /// Notifica errores de escrituras "fire-and-forget" (addIngreso, addSalida)
+  /// que no bloquean la UI pero cuyo fallo (permisos, red) debe verse en
+  /// pantalla en vez de desaparecer en silencio.
+  final _writeErrors = StreamController<String>.broadcast();
+  Stream<String> get writeErrors => _writeErrors.stream;
+
+  void _reportWriteError(String accion, Object e) {
+    _writeErrors.add('No se pudo guardar $accion: $e');
+  }
 
   // ── Nombres de colecciones (prefijo cf_ = módulo Cuarto Frío) ────────────
   // Las colecciones sin prefijo son compartidas entre módulos.
@@ -137,6 +148,8 @@ class FirestoreService {
     // Fire-and-forget: con persistencia offline activa el dato queda en el
     // caché local de forma inmediata y el stream lo refleja al instante.
     // No hay que esperar el ACK del servidor para desbloquear el formulario.
+    // Si el servidor termina rechazando la escritura (permisos, red), se
+    // reporta por `writeErrors` en vez de desaparecer en silencio.
     _db.collection(_colIngresos).add({
       'clienteId': clienteId,
       'clienteNombre': clienteNombre,
@@ -151,7 +164,7 @@ class FirestoreService {
       if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
       if (esRemanente) 'esRemanente': true,
       'bloqueNro': bloqueNro,
-    });
+    }).then((_) {}, onError: (e) => _reportWriteError('el ingreso', e));
     return Future.value();
   }
 
@@ -192,7 +205,7 @@ class FirestoreService {
     required bool esCola,
     required int unidades,
   }) {
-    // Fire-and-forget: mismo patron que addIngreso.
+    // Fire-and-forget: mismo patron que addIngreso (ver comentario ahí).
     _db.collection(_colSalidas).add({
       'clienteId': clienteId,
       'clienteNombre': clienteNombre,
@@ -205,7 +218,7 @@ class FirestoreService {
       'unidades': unidades,
       'timestamp': FieldValue.serverTimestamp(),
       if (_creadoPor.isNotEmpty) 'creadoPor': _creadoPor,
-    });
+    }).then((_) {}, onError: (e) => _reportWriteError('la salida', e));
     return Future.value();
   }
 
