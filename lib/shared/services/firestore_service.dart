@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
@@ -69,16 +70,27 @@ class FirestoreService {
 
   // ── Rangos (subcollección de cliente) ───────────────────────────────────
 
+  /// Orden: los rangos con [Rango.orden] explícito van primero (según ese
+  /// valor); los que no lo tienen (datos previos a esta funcionalidad) se
+  /// muestran después, ordenados alfabéticamente entre sí.
   Stream<List<Rango>> rangosStream(String clienteId) => _db
       .collection(_colClientes)
       .doc(clienteId)
       .collection('rangos')
-      .orderBy('nombre')
       .snapshots()
-      .map((s) => s.docs
-          .map((doc) => Rango.fromDoc(clienteId, doc))
-          .where((r) => r.activo)
-          .toList());
+      .map((s) {
+        final rangos = s.docs
+            .map((doc) => Rango.fromDoc(clienteId, doc))
+            .where((r) => r.activo)
+            .toList();
+        rangos.sort((a, b) {
+          final ao = a.orden ?? 999999;
+          final bo = b.orden ?? 999999;
+          if (ao != bo) return ao.compareTo(bo);
+          return a.nombre.compareTo(b.nombre);
+        });
+        return rangos;
+      });
 
   Future<void> addRango(
     String clienteId,
@@ -87,24 +99,25 @@ class FirestoreService {
     String tipo, {
     String subtipo = 'canastillas',
     String? descripcion,
-    bool esEspecial = false,
-  }) =>
-      _db
-          .collection(_colClientes)
-          .doc(clienteId)
-          .collection('rangos')
-          .add({
-        'nombre': nombre.trim(),
-        if (descripcion != null && descripcion.trim().isNotEmpty)
-          'descripcion': descripcion.trim(),
-        'multiplicador': multiplicador,
-        'tipo': tipo,
-        'subtipo': subtipo,
-        'activo': true,
-        if (esEspecial) 'esEspecial': true,
-        'creadoEn': FieldValue.serverTimestamp(),
-      });
+  }) async {
+    final rangosRef =
+        _db.collection(_colClientes).doc(clienteId).collection('rangos');
+    final existentes = await rangosRef.get();
+    await rangosRef.add({
+      'nombre': nombre.trim(),
+      if (descripcion != null && descripcion.trim().isNotEmpty)
+        'descripcion': descripcion.trim(),
+      'multiplicador': multiplicador,
+      'tipo': tipo,
+      'subtipo': subtipo,
+      'activo': true,
+      'orden': existentes.size,
+      'creadoEn': FieldValue.serverTimestamp(),
+    });
+  }
 
+  /// [esEspecial] es una decisión propia de cada cliente: el mismo nombre de
+  /// rango puede ser especial para un cliente y no para otro.
   Future<void> updateRango(
           String clienteId, String rangoId, Map<String, dynamic> data) =>
       _db
@@ -120,6 +133,19 @@ class FirestoreService {
       .collection('rangos')
       .doc(rangoId)
       .update({'activo': false});
+
+  /// Guarda el nuevo orden de los rangos de un cliente. [rangoIdsEnOrden]
+  /// debe traer TODOS los ids visibles, en el orden final deseado.
+  Future<void> reordenarRangos(
+      String clienteId, List<String> rangoIdsEnOrden) async {
+    final ref =
+        _db.collection(_colClientes).doc(clienteId).collection('rangos');
+    final batch = _db.batch();
+    for (var i = 0; i < rangoIdsEnOrden.length; i++) {
+      batch.update(ref.doc(rangoIdsEnOrden[i]), {'orden': i});
+    }
+    await batch.commit();
+  }
 
   // ── Ingresos ─────────────────────────────────────────────────────────────
 
@@ -422,11 +448,54 @@ class FirestoreService {
       .map((doc) =>
           doc.exists ? EmpresaConfig.fromDoc(doc) : EmpresaConfig.empty());
 
-  Future<void> updateEmpresaConfig(EmpresaConfig config) =>
-      _db.collection('config').doc('empresa').set(config.toMap());
+  /// Lee el documento de configuración de empresa directamente del servidor
+  /// (sin pasar por el StreamProvider global). Usar al abrir pantallas de
+  /// edición para evitar mostrar datos vacíos si el stream aún no entregó
+  /// su primer valor.
+  Future<EmpresaConfig> getEmpresaConfigOnce() async {
+    final doc = await _db.collection('config').doc('empresa').get();
+    return doc.exists ? EmpresaConfig.fromDoc(doc) : EmpresaConfig.empty();
+  }
+
+  Future<void> updateEmpresaConfig(EmpresaConfig config) => _db
+      .collection('config')
+      .doc('empresa')
+      .set(config.toMap(), SetOptions(merge: true));
 
   Future<void> updateEmpresaField(String field, dynamic value) =>
       _db.collection('config').doc('empresa').update({field: value});
+
+  /// Genera un nuevo código de eliminación numérico (4 dígitos) si el
+  /// guardado corresponde a un día anterior. Idempotente entre dispositivos
+  /// vía transacción (igual patrón que [resetCiclo]).
+  Future<void> regenerarCodigoEliminacionSiNecesario() async {
+    final ref = _db.collection('config').doc('empresa');
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final hoy = DateTime.now();
+      DateTime? fechaCodigo;
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>;
+        final f = data['codigoEliminacionFecha'];
+        if (f is Timestamp) fechaCodigo = f.toDate();
+      }
+      final esDeHoy = fechaCodigo != null &&
+          fechaCodigo.year == hoy.year &&
+          fechaCodigo.month == hoy.month &&
+          fechaCodigo.day == hoy.day;
+      if (esDeHoy) return; // Ya se generó uno hoy (este u otro dispositivo).
+
+      final nuevoCodigo = (1000 + Random().nextInt(9000)).toString();
+      tx.set(
+        ref,
+        {
+          'codigoEliminacion': nuevoCodigo,
+          'codigoEliminacionFecha': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    });
+  }
 
   // ── Ciclo de producción ───────────────────────────────────────────────────
 

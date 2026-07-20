@@ -126,9 +126,27 @@ class _RangosCliente extends StatelessWidget {
       builder: (ctx, snapshot) {
         final rangos = snapshot.data ?? [];
 
+        void mover(int index, int delta) {
+          final destino = index + delta;
+          if (destino < 0 || destino >= rangos.length) return;
+          final reordenados = [...rangos];
+          final item = reordenados.removeAt(index);
+          reordenados.insert(destino, item);
+          FirestoreService.instance.reordenarRangos(
+              cliente.id, reordenados.map((r) => r.id).toList());
+        }
+
         return Column(
           children: [
-            ...rangos.map((r) => _RangoTile(clienteId: cliente.id, rango: r)),
+            for (var i = 0; i < rangos.length; i++)
+              _RangoTile(
+                clienteId: cliente.id,
+                rango: rangos[i],
+                puedeSubir: i > 0,
+                puedeBajar: i < rangos.length - 1,
+                onSubir: () => mover(i, -1),
+                onBajar: () => mover(i, 1),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
               child: OutlinedButton.icon(
@@ -349,7 +367,18 @@ class _RangosCliente extends StatelessWidget {
 class _RangoTile extends StatelessWidget {
   final String clienteId;
   final Rango rango;
-  const _RangoTile({required this.clienteId, required this.rango});
+  final bool puedeSubir;
+  final bool puedeBajar;
+  final VoidCallback onSubir;
+  final VoidCallback onBajar;
+  const _RangoTile({
+    required this.clienteId,
+    required this.rango,
+    required this.puedeSubir,
+    required this.puedeBajar,
+    required this.onSubir,
+    required this.onBajar,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -426,6 +455,16 @@ class _RangoTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_upward, size: 18),
+            tooltip: 'Subir',
+            onPressed: puedeSubir ? onSubir : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_downward, size: 18),
+            tooltip: 'Bajar',
+            onPressed: puedeBajar ? onBajar : null,
+          ),
           IconButton(
             icon: Icon(
               rango.esEspecial ? Icons.star : Icons.star_border,

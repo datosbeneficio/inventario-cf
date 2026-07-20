@@ -78,13 +78,18 @@ class CicloAutoResetService {
       final hoyFecha = DateTime(hoy.year, hoy.month, hoy.day);
 
       if (_resetFecha == hoyFecha) return;
+      _resetFecha = hoyFecha;
+
+      // Código de eliminación: se regenera solo (aleatorio) una vez al día,
+      // independiente del estado del ciclo. La transacción interna es
+      // idempotente entre dispositivos.
+      unawaited(FirestoreService.instance.regenerarCodigoEliminacionSiNecesario());
 
       final esDeHoy = ciclo.inicio.year == hoy.year &&
           ciclo.inicio.month == hoy.month &&
           ciclo.inicio.day == hoy.day;
 
       if (!esDeHoy) {
-        _resetFecha = hoyFecha;
         await ejecutarReset(FirestoreService.instance.resetCiclo);
       }
     });

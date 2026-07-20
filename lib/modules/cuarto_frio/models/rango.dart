@@ -12,6 +12,11 @@ class Rango {
   final bool activo;
   final bool esEspecial;
 
+  /// Posición para mostrar el rango en listas/formularios. Los rangos con
+  /// [orden] explícito se muestran en ese orden; los que no lo tienen
+  /// (datos previos a esta funcionalidad) se ordenan alfabéticamente al final.
+  final int? orden;
+
   const Rango({
     required this.id,
     required this.clienteId,
@@ -22,6 +27,7 @@ class Rango {
     required this.subtipo,
     required this.activo,
     this.esEspecial = false,
+    this.orden,
   });
 
   bool get esAves => tipo == kTipoAves;
@@ -43,6 +49,7 @@ class Rango {
       subtipo: d['subtipo'] ?? kSubtipoCanastillas,
       activo: d['activo'] ?? true,
       esEspecial: d['esEspecial'] ?? false,
+      orden: d['orden'] as int?,
     );
   }
 }

@@ -27,7 +27,8 @@ Future<pw.Document> buildDespachoPdf(
       build: (ctx) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          _header(empresa, logoImg),
+          _header(empresa, logoImg,
+              d.lineas.isNotEmpty ? d.lineas.first.clienteNombre : ''),
           pw.SizedBox(height: 8),
           _idRow(d),
           pw.SizedBox(height: 6),
@@ -64,12 +65,24 @@ Future<pw.Document> buildDespachoPdf(
 
 // ── Encabezado empresa ──────────────────────────────────────────────────────
 
-pw.Widget _header(EmpresaConfig e, pw.ImageProvider logo) {
+pw.Widget _header(EmpresaConfig e, pw.ImageProvider logo, String clienteNombre) {
   final bold = pw.TextStyle(fontWeight: pw.FontWeight.bold);
   return pw.Column(
     children: [
-      pw.Center(
-        child: pw.Image(logo, height: 48, fit: pw.BoxFit.contain),
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.center,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Image(logo, height: 48, fit: pw.BoxFit.contain),
+          if (clienteNombre.isNotEmpty) ...[
+            pw.SizedBox(width: 16),
+            pw.Text(
+              clienteNombre.toUpperCase(),
+              style: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold, fontSize: 20),
+            ),
+          ],
+        ],
       ),
       pw.SizedBox(height: 4),
       if (e.nombre.isNotEmpty)

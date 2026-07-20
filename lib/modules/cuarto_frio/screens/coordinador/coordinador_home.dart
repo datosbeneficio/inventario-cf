@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:provider/provider.dart';
 import '../../../../shared/models/ciclo_config.dart';
+import '../../../../shared/models/empresa_config.dart';
 import '../../../../shared/providers/auth_provider.dart';
 import '../../../../shared/services/ciclo_auto_reset_service.dart';
 import '../../../../shared/services/firestore_service.dart';
@@ -75,6 +77,11 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
             ),
           ),
           IconButton(
+            icon: const Icon(Icons.vpn_key_outlined),
+            tooltip: 'Código de eliminación de hoy',
+            onPressed: () => _mostrarCodigoEliminacion(context),
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_sweep_outlined),
             tooltip: 'Limpiar datos de prueba',
             onPressed: () => _confirmarLimpieza(context),
@@ -103,6 +110,70 @@ class _CoordinadorHomeState extends State<CoordinadorHome> {
             .map((t) =>
                 NavigationDestination(icon: Icon(t.icon), label: t.label))
             .toList(),
+      ),
+    );
+  }
+
+  Future<void> _mostrarCodigoEliminacion(BuildContext context) async {
+    final codigo = context.read<EmpresaConfig>().codigoEliminacion;
+    final cs = Theme.of(context).colorScheme;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.vpn_key_outlined, size: 40, color: cs.primary),
+        title: const Text('Código de eliminación de hoy'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Compártelo con los supervisores que necesiten eliminar un '
+              'registro. Cambia automáticamente cada día.',
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                codigo.isEmpty ? '—' : codigo,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 6,
+                  color: cs.onPrimaryContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.copy_outlined, size: 18),
+            label: const Text('Copiar'),
+            onPressed: codigo.isEmpty
+                ? null
+                : () {
+                    Clipboard.setData(ClipboardData(text: codigo));
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Código copiado'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar'),
+          ),
+        ],
       ),
     );
   }

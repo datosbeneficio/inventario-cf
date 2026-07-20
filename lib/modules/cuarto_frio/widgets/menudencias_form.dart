@@ -284,13 +284,17 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
                         final selected = _rangoId == r.id;
                         return ChoiceChip(
                           avatar: Icon(
-                            r.esPaquetes
-                                ? Icons.inventory_2
-                                : Icons.shopping_basket,
+                            r.esEspecial
+                                ? Icons.star
+                                : r.esPaquetes
+                                    ? Icons.inventory_2
+                                    : Icons.shopping_basket,
                             size: 16,
-                            color: selected
-                                ? cs.primary
-                                : cs.onSurfaceVariant,
+                            color: r.esEspecial
+                                ? (selected ? cs.tertiary : cs.error)
+                                : selected
+                                    ? cs.tertiary
+                                    : cs.onSurfaceVariant,
                           ),
                           label: Text(
                             r.esPaquetes
@@ -304,6 +308,11 @@ class _MenudenciasFormState extends State<MenudenciasForm> {
                             ),
                           ),
                           selected: selected,
+                          backgroundColor:
+                              r.esEspecial ? cs.errorContainer : null,
+                          side: r.esEspecial
+                              ? BorderSide(color: cs.error.withValues(alpha: 0.4))
+                              : null,
                           selectedColor: cs.tertiaryContainer,
                           checkmarkColor: cs.tertiary,
                           onSelected: (_) => setState(() {

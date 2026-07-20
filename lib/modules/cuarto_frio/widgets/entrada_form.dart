@@ -284,6 +284,11 @@ class _EntradaFormState extends State<EntradaForm> {
                       children: rangos.map((r) {
                         final selected = _rangoId == r.id;
                         return ChoiceChip(
+                          avatar: r.esEspecial
+                              ? Icon(Icons.star,
+                                  size: 15,
+                                  color: selected ? cs.primary : cs.error)
+                              : null,
                           label: Text(
                             '${r.nombre}  ×${formatNum(r.multiplicador)}',
                             style: TextStyle(
@@ -294,6 +299,11 @@ class _EntradaFormState extends State<EntradaForm> {
                             ),
                           ),
                           selected: selected,
+                          backgroundColor:
+                              r.esEspecial ? cs.errorContainer : null,
+                          side: r.esEspecial
+                              ? BorderSide(color: cs.error.withValues(alpha: 0.4))
+                              : null,
                           selectedColor: cs.primaryContainer,
                           checkmarkColor: cs.primary,
                           onSelected: (_) => setState(() {
