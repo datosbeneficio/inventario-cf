@@ -33,44 +33,233 @@ class ClientesScreen extends StatelessWidget {
   }
 
   void _showCrearClienteDialog(BuildContext context) {
-    final ctrl = TextEditingController();
+    final nombreCtrl = TextEditingController();
+    final marcaCtrl = TextEditingController();
+    final diasAvesCtrl = TextEditingController(text: '30');
+    final diasMenudCtrl = TextEditingController(text: '30');
     final formKey = GlobalKey<FormState>();
+    bool marcaEditadaManualmente = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Crear cliente'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: ctrl,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Nombre del cliente',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.business),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDs) => AlertDialog(
+          title: const Text('Crear cliente'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nombreCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre del cliente',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.business),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Campo requerido'
+                        : null,
+                    onChanged: (v) {
+                      if (marcaEditadaManualmente) return;
+                      final letra = v.trim().isNotEmpty
+                          ? v.trim()[0].toUpperCase()
+                          : '';
+                      setDs(() => marcaCtrl.text = letra);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: marcaCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    maxLength: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Marca en lote',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.tag),
+                      hintText: 'Ej: A',
+                      counterText: '',
+                    ),
+                    onChanged: (_) =>
+                        setDs(() => marcaEditadaManualmente = true),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Campo requerido'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: diasAvesCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Días venc. Aves',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) {
+                            final n = int.tryParse(v?.trim() ?? '');
+                            return (n == null || n <= 0) ? 'Inválido' : null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: diasMenudCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Días venc. Menud.',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) {
+                            final n = int.tryParse(v?.trim() ?? '');
+                            return (n == null || n <= 0) ? 'Inválido' : null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                FirestoreService.instance.addCliente(
+                  nombreCtrl.text,
+                  marcaLote: marcaCtrl.text,
+                  diasVencimientoAves: int.parse(diasAvesCtrl.text.trim()),
+                  diasVencimientoMenudencias:
+                      int.parse(diasMenudCtrl.text.trim()),
+                );
+                Navigator.pop(ctx);
+              },
+              child: const Text('Crear'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              FirestoreService.instance.addCliente(ctrl.text);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Crear'),
-          ),
-        ],
       ),
     );
   }
+}
+
+// ── Editar datos de un cliente existente ───────────────────────────────────
+
+void _showEditarClienteDialog(BuildContext context, Cliente cliente) {
+  final nombreCtrl = TextEditingController(text: cliente.nombre);
+  final marcaCtrl = TextEditingController(text: cliente.marcaLoteEfectiva);
+  final diasAvesCtrl =
+      TextEditingController(text: cliente.diasVencimientoAves.toString());
+  final diasMenudCtrl = TextEditingController(
+      text: cliente.diasVencimientoMenudencias.toString());
+  final formKey = GlobalKey<FormState>();
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('Editar — ${cliente.nombre}'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nombreCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre del cliente',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.business),
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: marcaCtrl,
+                textCapitalization: TextCapitalization.characters,
+                maxLength: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Marca en lote',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.tag),
+                  hintText: 'Ej: A',
+                  counterText: '',
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: diasAvesCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Días venc. Aves',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        final n = int.tryParse(v?.trim() ?? '');
+                        return (n == null || n <= 0) ? 'Inválido' : null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: diasMenudCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Días venc. Menud.',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        final n = int.tryParse(v?.trim() ?? '');
+                        return (n == null || n <= 0) ? 'Inválido' : null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!formKey.currentState!.validate()) return;
+            FirestoreService.instance.updateCliente(
+              cliente.id,
+              nombre: nombreCtrl.text,
+              marcaLote: marcaCtrl.text,
+              diasVencimientoAves: int.parse(diasAvesCtrl.text.trim()),
+              diasVencimientoMenudencias:
+                  int.parse(diasMenudCtrl.text.trim()),
+            );
+            Navigator.pop(ctx);
+          },
+          child: const Text('Guardar'),
+        ),
+      ],
+    ),
+  );
 }
 
 // ── Tile de cliente con ExpansionTile para sus rangos ─────────────────────
@@ -87,10 +276,18 @@ class _ClienteTile extends StatelessWidget {
         leading: const CircleAvatar(child: Icon(Icons.business)),
         title: Text(cliente.nombre,
             style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: const Text('Toca para gestionar rangos'),
+        subtitle: Text(
+            'Toca para gestionar rangos · Lote: ${cliente.marcaLoteEfectiva} · '
+            'Venc. ${cliente.diasVencimientoAves}d aves / '
+            '${cliente.diasVencimientoMenudencias}d menud.'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Editar cliente',
+              onPressed: () => _showEditarClienteDialog(context, cliente),
+            ),
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
               tooltip: 'Eliminar cliente',

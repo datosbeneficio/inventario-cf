@@ -114,6 +114,22 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
+  /// Autocompleta lote (fecha + marca del cliente) y vencimientos (fecha +
+  /// días configurados por cliente y tipo de producto). Se recalcula al
+  /// elegir cliente o cambiar la fecha de despacho; el supervisor puede
+  /// editar el resultado a mano si un caso puntual lo requiere.
+  void _recalcularLoteYVencimientos(Cliente cliente) {
+    final lote = '${formatLoteFecha(_fechaDespacho)}${cliente.marcaLoteEfectiva}';
+    setState(() {
+      _lotePolloCtrl.text = lote;
+      _loteMenudCtrl.text = lote;
+      _vencimientoPollo = _fechaDespacho
+          .add(Duration(days: cliente.diasVencimientoAves));
+      _vencimientoMenudencias = _fechaDespacho
+          .add(Duration(days: cliente.diasVencimientoMenudencias));
+    });
+  }
+
   String get _horaSalidaStr {
     final h = _horaSalida.hourOfPeriod == 0 ? 12 : _horaSalida.hourOfPeriod;
     final m = _horaSalida.minute.toString().padLeft(2, '0');
@@ -651,8 +667,15 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                         child: _DateField(
                           label: 'Fecha de despacho',
                           date: _fechaDespacho,
-                          onPicked: (d) =>
-                              setState(() => _fechaDespacho = d),
+                          onPicked: (d) {
+                            setState(() => _fechaDespacho = d);
+                            if (_clienteId != null) {
+                              final cliente = context
+                                  .read<List<Cliente>>()
+                                  .firstWhere((c) => c.id == _clienteId);
+                              _recalcularLoteYVencimientos(cliente);
+                            }
+                          },
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -889,6 +912,7 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                                 _clienteId = v;
                                 _clienteNombre = cliente.nombre;
                               });
+                              _recalcularLoteYVencimientos(cliente);
                             }
                           : null,
                       validator: (v) =>

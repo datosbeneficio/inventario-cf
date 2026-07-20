@@ -59,10 +59,33 @@ class FirestoreService {
           .where((c) => c.activo)
           .toList());
 
-  Future<void> addCliente(String nombre) => _db.collection(_colClientes).add({
+  Future<void> addCliente(
+    String nombre, {
+    String marcaLote = '',
+    int diasVencimientoAves = 30,
+    int diasVencimientoMenudencias = 30,
+  }) =>
+      _db.collection(_colClientes).add({
         'nombre': nombre.trim(),
         'activo': true,
+        'marcaLote': marcaLote.trim().toUpperCase(),
+        'diasVencimientoAves': diasVencimientoAves,
+        'diasVencimientoMenudencias': diasVencimientoMenudencias,
         'creadoEn': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> updateCliente(
+    String id, {
+    required String nombre,
+    required String marcaLote,
+    required int diasVencimientoAves,
+    required int diasVencimientoMenudencias,
+  }) =>
+      _db.collection(_colClientes).doc(id).update({
+        'nombre': nombre.trim(),
+        'marcaLote': marcaLote.trim().toUpperCase(),
+        'diasVencimientoAves': diasVencimientoAves,
+        'diasVencimientoMenudencias': diasVencimientoMenudencias,
       });
 
   Future<void> deleteCliente(String id) =>

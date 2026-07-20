@@ -4,6 +4,7 @@ final _dateFormat = DateFormat('dd/MM/yyyy');
 final _dateLongFormat = DateFormat("EEEE d 'de' MMMM yyyy", 'es');
 final _timeFormat = DateFormat('HH:mm');
 final _dateTimeFormat = DateFormat('dd/MM/yyyy HH:mm');
+final _loteFechaFormat = DateFormat('ddMMyy');
 final _numberFormat = NumberFormat('#,##0.##', 'es');
 
 String formatDate(DateTime dt) => _dateFormat.format(dt);
@@ -11,6 +12,8 @@ String formatDate(DateTime dt) => _dateFormat.format(dt);
 String formatDateLong(DateTime dt) => _dateLongFormat.format(dt);
 String formatTime(DateTime dt) => _timeFormat.format(dt);
 String formatDateTime(DateTime dt) => _dateTimeFormat.format(dt);
+/// Fecha en formato DDMMAA para armar números de lote (ej. "200726").
+String formatLoteFecha(DateTime dt) => _loteFechaFormat.format(dt);
 String formatNum(num value) => _numberFormat.format(value);
 String formatKg(double value) => '${_numberFormat.format(value)} kg';
 
