@@ -133,41 +133,6 @@ class DespachoDetalleScreen extends StatelessWidget {
               const SizedBox(height: 16),
             ],
 
-            // ── Foto del precinto ───────────────────────────────────────
-            if (despacho.precintoFotoUrl != null &&
-                despacho.precintoFotoUrl!.isNotEmpty) ...[
-              Text('Foto del precinto',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  despacho.precintoFotoUrl!,
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (_, child, progress) =>
-                      progress == null
-                          ? child
-                          : const SizedBox(
-                              height: 220,
-                              child: Center(
-                                  child: CircularProgressIndicator())),
-                  errorBuilder: (_, error, stack) => const SizedBox(
-                    height: 80,
-                    child: Center(
-                      child: Text('No se pudo cargar la imagen',
-                          style: TextStyle(color: Colors.black45)),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
             // ── Tabla de líneas ─────────────────────────────────────────
             Text('Productos despachados',
                 style: Theme.of(context)
@@ -196,6 +161,15 @@ class DespachoDetalleScreen extends StatelessWidget {
                 Expanded(
                   child: Column(
                     children: [
+                      const Text('ENCARGADO DESPACHO',
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text('Nombre: ${despacho.encargadoNombre}',
+                          style: const TextStyle(fontSize: 12)),
+                      Text('C.C. ${despacho.encargadoCedula}',
+                          style: const TextStyle(fontSize: 12)),
+                      const SizedBox(height: 8),
                       Container(
                         height: 60,
                         decoration: const BoxDecoration(
@@ -214,6 +188,15 @@ class DespachoDetalleScreen extends StatelessWidget {
                 Expanded(
                   child: Column(
                     children: [
+                      const Text('ENCARGADO TRANSPORTE',
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text('Nombre: ${despacho.conductorNombre}',
+                          style: const TextStyle(fontSize: 12)),
+                      Text('C.C. ${despacho.conductorCedula}',
+                          style: const TextStyle(fontSize: 12)),
+                      const SizedBox(height: 8),
                       Container(
                         height: 60,
                         decoration: const BoxDecoration(
@@ -295,6 +278,9 @@ class _InfoGrid extends StatelessWidget {
         'Vence Pollo', vencPollo],
       ['Lote Menudencias', d.loteMenudencias,
         'Vence Menudencias', vencMenud],
+      ['Dictamen',
+        d.dictamen == 'aprobado' ? 'Aprobado' : 'Aprob. Condicional',
+        'Liberación', d.liberado ? 'Sí' : 'No'],
     ];
 
     return Table(
@@ -357,16 +343,15 @@ class _LineasCard extends StatelessWidget {
               WidgetStateProperty.all(cs.secondaryContainer),
           columnSpacing: 20,
           columns: const [
-            DataColumn(label: Text('Cliente')),
             DataColumn(label: Text('Rango')),
-            DataColumn(label: Text('Canast.'), numeric: true),
             DataColumn(label: Text('Unidades'), numeric: true),
-            DataColumn(label: Text('Peso neto'), numeric: true),
+            DataColumn(label: Text('Peso (kg)'), numeric: true),
+            DataColumn(label: Text('Peso promedio'), numeric: true),
+            DataColumn(label: Text('Canastillas'), numeric: true),
           ],
           rows: [
             ...d.lineas.map(
               (l) => DataRow(cells: [
-                DataCell(Text(l.clienteNombre)),
                 DataCell(
                   l.esRemanente
                       ? Row(
@@ -398,26 +383,12 @@ class _LineasCard extends StatelessWidget {
                         )
                       : Text(l.rangoNombre),
                 ),
-                DataCell(Text(formatNum(l.canastillas))),
                 DataCell(Text(formatNum(l.unidades))),
-                DataCell(
-                  l.rangoTipo == 'aves' && l.unidades > 0
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(formatKg(l.peso)),
-                            Text(
-                              formatPesoAve(l.peso, l.unidades),
-                              style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.black54,
-                                  fontStyle: FontStyle.italic),
-                            ),
-                          ],
-                        )
-                      : Text(formatKg(l.peso)),
-                ),
+                DataCell(Text(formatKg(l.peso))),
+                DataCell(Text(l.rangoTipo == 'aves' && l.unidades > 0
+                    ? formatPesoAve(l.peso, l.unidades)
+                    : '—')),
+                DataCell(Text(formatNum(l.canastillas))),
               ]),
             ),
             // Fila de totales
@@ -426,14 +397,14 @@ class _LineasCard extends StatelessWidget {
               cells: [
                 const DataCell(Text('TOTAL',
                     style: TextStyle(fontWeight: FontWeight.bold))),
-                const DataCell(Text('')),
-                DataCell(Text(formatNum(d.totalCanastillas),
-                    style:
-                        const TextStyle(fontWeight: FontWeight.bold))),
                 DataCell(Text(formatNum(d.totalUnidades),
                     style:
                         const TextStyle(fontWeight: FontWeight.bold))),
                 DataCell(Text(formatNum(d.totalPeso),
+                    style:
+                        const TextStyle(fontWeight: FontWeight.bold))),
+                const DataCell(Text('')),
+                DataCell(Text(formatNum(d.totalCanastillas),
                     style:
                         const TextStyle(fontWeight: FontWeight.bold))),
               ],

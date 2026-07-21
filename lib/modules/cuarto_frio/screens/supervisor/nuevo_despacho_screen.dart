@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import '../../../../shared/models/ciclo_config.dart';
@@ -56,12 +55,17 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   DateTime? _vencimientoPollo;
   DateTime? _vencimientoMenudencias;
 
-  // ── Foto del precinto ────────────────────────────────────────────────────
-  Uint8List? _fotoBytes;
-
   // ── Cliente del despacho ─────────────────────────────────────────────────
   String? _clienteId;
   String _clienteNombre = '';
+
+  // ── Encargado de despacho ────────────────────────────────────────────────
+  final _encargadoNombreCtrl = TextEditingController();
+  final _encargadoCedulaCtrl = TextEditingController();
+
+  // ── Dictamen y liberación ────────────────────────────────────────────────
+  String _dictamen = 'aprobado';
+  bool _liberado = true;
 
   // ── Líneas de producto ───────────────────────────────────────────────────
   final List<DespachoLinea> _lineas = [];
@@ -95,7 +99,10 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
   void initState() {
     super.initState();
     // Compute next guía number after the first frame (providers ready)
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initGuia());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initGuia();
+      _prefillEncargado();
+    });
   }
 
   @override
@@ -109,6 +116,8 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     _obsCtrl.dispose();
     _lotePolloCtrl.dispose();
     _loteMenudCtrl.dispose();
+    _encargadoNombreCtrl.dispose();
+    _encargadoCedulaCtrl.dispose();
     super.dispose();
   }
 
@@ -147,6 +156,23 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       if (n > maxNro) maxNro = n;
     }
     _guiaCtrl.text = (maxNro + 1).toString();
+  }
+
+  /// El encargado de despacho rara vez cambia de un despacho a otro, así que
+  /// se prellena con el del despacho más reciente (editable si hace falta).
+  void _prefillEncargado() {
+    if (!mounted || _encargadoNombreCtrl.text.isNotEmpty) return;
+    final despachos = context.read<List<Despacho>>();
+    Despacho? ultimo;
+    for (final d in despachos) {
+      if (ultimo == null || d.timestamp.isAfter(ultimo.timestamp)) {
+        ultimo = d;
+      }
+    }
+    if (ultimo != null) {
+      _encargadoNombreCtrl.text = ultimo.encargadoNombre;
+      _encargadoCedulaCtrl.text = ultimo.encargadoCedula;
+    }
   }
 
   /// Al elegir un vehículo, autocompleta capacidad y busca el último
@@ -195,93 +221,19 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
       _vencimientoPollo = null;
       _vencimientoMenudencias = null;
       _mostrarErrorVenc = false;
-      _fotoBytes = null;
       _clienteId = null;
       _clienteNombre = '';
+      _dictamen = 'aprobado';
+      _liberado = true;
       _lineas.clear();
       _descartes.clear();
       _submitting = false;
       _despachado = false;
       _ultimoDespacho = null;
     });
-    // Re-calcular guía después de limpiar
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _initGuia());
-  }
-
-  // ── Foto del precinto ────────────────────────────────────────────────────
-
-  Future<void> _pickFoto(ImageSource source) async {
-    try {
-      final picker = ImagePicker();
-      final xfile = await picker.pickImage(
-        source: source,
-        imageQuality: 70,
-        maxWidth: 1200,
-      );
-      if (xfile == null) return;
-      final bytes = await xfile.readAsBytes();
-      setState(() {
-        _fotoBytes = bytes;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar la imagen: $e')),
-        );
-      }
-    }
-  }
-
-  void _showFotoOptions() {
-    final cs = Theme.of(context).colorScheme;
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Text('Foto del precinto',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: cs.onSurface)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Tomar foto'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickFoto(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Elegir de galería / archivos'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickFoto(ImageSource.gallery);
-              },
-            ),
-            if (_fotoBytes != null)
-              ListTile(
-                leading:
-                    const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('Quitar foto',
-                    style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _fotoBytes = null;
-                  });
-                },
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
+    // Re-calcular guía y reponer encargado después de limpiar
+    // (el encargado no se borra: casi nunca cambia de un despacho a otro).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initGuia());
   }
 
   // ── Confirmar ─────────────────────────────────────────────────────────────
@@ -310,6 +262,11 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
     }
     if (_lineas.isEmpty) {
       _showError('Agrega al menos una línea de producto');
+      return;
+    }
+    if (_encargadoNombreCtrl.text.trim().isEmpty ||
+        _encargadoCedulaCtrl.text.trim().isEmpty) {
+      _showError('Completa el nombre y la cédula del encargado de despacho');
       return;
     }
 
@@ -373,6 +330,10 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
         lineas: _lineas,
         descartes: _descartes,
         timestamp: DateTime.now(),
+        encargadoNombre: _encargadoNombreCtrl.text.trim(),
+        encargadoCedula: _encargadoCedulaCtrl.text.trim(),
+        dictamen: _dictamen,
+        liberado: _liberado,
       );
 
       await FirestoreService.instance.addDespacho(
@@ -417,7 +378,6 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
             _SuccessBanner(
               guiaNro: _ultimoDespacho!.guiaNro,
               despacho: _ultimoDespacho!,
-              fotoBytes: _fotoBytes,
               empresa: context.read<EmpresaConfig>(),
               onVerGuia: () => Navigator.push(
                 context,
@@ -717,13 +677,31 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: TextFormField(
-                          controller: _precintoCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'N° Precinto',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.lock_outline),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: cs.tertiaryContainer.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: cs.tertiary, width: 1.5),
+                          ),
+                          child: TextFormField(
+                            controller: _precintoCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'N° Precinto *',
+                              labelStyle: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: cs.onTertiaryContainer),
+                              border: const OutlineInputBorder(
+                                  borderSide: BorderSide.none),
+                              filled: true,
+                              fillColor: Colors.transparent,
+                              prefixIcon:
+                                  Icon(Icons.lock_outline, color: cs.tertiary),
+                            ),
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Campo obligatorio'
+                                : null,
                           ),
                         ),
                       ),
@@ -878,10 +856,91 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // ── Foto del precinto ──────────────────────────────
-                    _PrecintoFotoWidget(
-                      fotoBytes: _fotoBytes,
-                      onTap: _showFotoOptions,
+                    // ── Encargado de despacho ──────────────────────────
+                    _SectionTitle(
+                        icon: Icons.badge_outlined,
+                        label: 'Encargado de despacho'),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _encargadoNombreCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            labelText: 'Nombre *',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person_outline),
+                          ),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Campo obligatorio'
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _encargadoCedulaCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Cédula *',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.badge_outlined),
+                          ),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Campo obligatorio'
+                              : null,
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 20),
+
+                    // ── Dictamen y liberación ───────────────────────────
+                    _SectionTitle(
+                        icon: Icons.fact_check_outlined,
+                        label: 'Dictamen y liberación'),
+                    const SizedBox(height: 8),
+                    Text('Dictamen de los productos',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant)),
+                    const SizedBox(height: 6),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: 'aprobado',
+                          label: Text('Aprobado'),
+                          icon: Icon(Icons.check_circle_outline),
+                        ),
+                        ButtonSegment(
+                          value: 'aprobado_condicional',
+                          label: Text('Aprob. Condicional'),
+                          icon: Icon(Icons.warning_amber_outlined),
+                        ),
+                      ],
+                      selected: {_dictamen},
+                      onSelectionChanged: (s) =>
+                          setState(() => _dictamen = s.first),
+                    ),
+                    const SizedBox(height: 12),
+                    Text('Liberación del producto',
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant)),
+                    const SizedBox(height: 6),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: true,
+                          label: Text('Liberado'),
+                          icon: Icon(Icons.lock_open_outlined),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          label: Text('No liberado'),
+                          icon: Icon(Icons.lock_outline),
+                        ),
+                      ],
+                      selected: {_liberado},
+                      onSelectionChanged: (s) =>
+                          setState(() => _liberado = s.first),
                     ),
                     const SizedBox(height: 20),
 
@@ -1286,7 +1345,6 @@ class _NuevoDespachoScreenState extends State<NuevoDespachoScreen> {
 class _SuccessBanner extends StatelessWidget {
   final String guiaNro;
   final Despacho despacho;
-  final Uint8List? fotoBytes;
   final EmpresaConfig empresa;
   final VoidCallback onVerGuia;
   final VoidCallback onNuevoDespacho;
@@ -1294,7 +1352,6 @@ class _SuccessBanner extends StatelessWidget {
   const _SuccessBanner({
     required this.guiaNro,
     required this.despacho,
-    required this.fotoBytes,
     required this.empresa,
     required this.onVerGuia,
     required this.onNuevoDespacho,
@@ -1303,9 +1360,7 @@ class _SuccessBanner extends StatelessWidget {
   Future<void> _imprimirPdf(BuildContext context) async {
     await Printing.layoutPdf(
       onLayout: (fmt) async =>
-          (await buildDespachoPdf(despacho, empresa,
-                  fotoBytes: fotoBytes))
-              .save(),
+          (await buildDespachoPdf(despacho, empresa)).save(),
     );
   }
 
@@ -1342,12 +1397,6 @@ class _SuccessBanner extends StatelessWidget {
                         'Guía N° $guiaNro guardada correctamente.',
                         style: const TextStyle(fontSize: 13),
                       ),
-                      if (fotoBytes != null)
-                        const Text(
-                          'Imprime el PDF ahora para incluir la foto del precinto.',
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.orange),
-                        ),
                     ],
                   ),
                 ),
@@ -1395,67 +1444,6 @@ class _SuccessBanner extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Widget de foto del precinto ───────────────────────────────────────────────
-
-class _PrecintoFotoWidget extends StatelessWidget {
-  final Uint8List? fotoBytes;
-  final VoidCallback onTap;
-
-  const _PrecintoFotoWidget({
-    required this.fotoBytes,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    if (fotoBytes == null) {
-      return OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.add_a_photo_outlined),
-        label: const Text('Adjuntar foto del precinto'),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.memory(
-            fotoBytes!,
-            height: 180,
-            fit: BoxFit.cover,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            Icon(Icons.lock, size: 14, color: cs.onSurfaceVariant),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text('Foto del precinto adjunta',
-                  style: TextStyle(
-                      fontSize: 12, color: cs.onSurfaceVariant)),
-            ),
-            TextButton.icon(
-              onPressed: onTap,
-              icon: const Icon(Icons.edit, size: 16),
-              label: const Text('Cambiar'),
-              style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

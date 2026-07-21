@@ -7,13 +7,7 @@ import '../../../shared/utils/constants.dart'; // kDescartesSiglas, kTipoAves
 import '../../../shared/utils/formatters.dart';
 
 /// Construye el documento PDF de la guía de despacho.
-/// [fotoBytes] son los bytes de la foto del precinto en memoria;
-/// si se omiten el PDF se genera sin esa sección.
-Future<pw.Document> buildDespachoPdf(
-    Despacho d, EmpresaConfig empresa, {Uint8List? fotoBytes}) async {
-  final pw.ImageProvider? precintoImg =
-      fotoBytes != null ? pw.MemoryImage(fotoBytes) : null;
-
+Future<pw.Document> buildDespachoPdf(Despacho d, EmpresaConfig empresa) async {
   // Cargar logo desde assets
   final logoData = await rootBundle.load('assets/images/logo.png');
   final logoImg = pw.MemoryImage(logoData.buffer.asUint8List());
@@ -27,6 +21,8 @@ Future<pw.Document> buildDespachoPdf(
       build: (ctx) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
+          _titulo(),
+          pw.SizedBox(height: 6),
           _header(empresa, logoImg,
               d.lineas.isNotEmpty ? d.lineas.first.clienteNombre : ''),
           pw.SizedBox(height: 8),
@@ -49,12 +45,8 @@ Future<pw.Document> buildDespachoPdf(
             pw.SizedBox(height: 10),
             _observacionesSection(d.observaciones),
           ],
-          if (precintoImg != null) ...[
-            pw.SizedBox(height: 10),
-            _precintoSection(precintoImg),
-          ],
           pw.SizedBox(height: 16),
-          _firmas(),
+          _firmas(d),
         ],
       ),
     ),
@@ -62,6 +54,15 @@ Future<pw.Document> buildDespachoPdf(
 
   return doc;
 }
+
+// ── Título del formato ───────────────────────────────────────────────────
+
+pw.Widget _titulo() => pw.Center(
+      child: pw.Text(
+        'GUIA DE TRANSPORTE Y DESTINO',
+        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 15),
+      ),
+    );
 
 // ── Encabezado empresa ──────────────────────────────────────────────────────
 
@@ -174,6 +175,9 @@ pw.Widget _infoGrid(Despacho d) {
     if (d.loteEspecial.isNotEmpty)
       ['LOTE ESPECIAL:', d.loteEspecial, 'VENCE ESPECIAL:',
        d.vencimientoEspecial != null ? formatDate(d.vencimientoEspecial!) : ''],
+    ['DICTAMEN:',
+     d.dictamen == 'aprobado' ? 'APROBADO' : 'APROB. CONDICIONAL',
+     'LIBERACIÓN:', d.liberado ? 'SÍ' : 'NO'],
   ];
 
   const labelStyle = pw.TextStyle(fontSize: 8);
@@ -233,11 +237,11 @@ pw.Widget _lineasTable(Despacho d, {required bool esEspecial}) {
   return pw.Table(
     border: pw.TableBorder.all(width: 0.5),
     columnWidths: const {
-      0: pw.FlexColumnWidth(2),
-      1: pw.FlexColumnWidth(2),
-      2: pw.FlexColumnWidth(1),
-      3: pw.FlexColumnWidth(1),
-      4: pw.FlexColumnWidth(1.4),
+      0: pw.FlexColumnWidth(2.2),
+      1: pw.FlexColumnWidth(1.2),
+      2: pw.FlexColumnWidth(1.3),
+      3: pw.FlexColumnWidth(1.4),
+      4: pw.FlexColumnWidth(1.3),
     },
     children: [
       pw.TableRow(
@@ -245,17 +249,16 @@ pw.Widget _lineasTable(Despacho d, {required bool esEspecial}) {
           color: esEspecial ? PdfColors.red50 : PdfColors.grey200,
         ),
         children: [
-          _cell('CLIENTE', headerStyle),
           _cell('RANGO', headerStyle),
-          _cell('CANAST.', headerStyle),
           _cell('UNIDADES', headerStyle),
-          _cell('PESO NETO', headerStyle),
+          _cell('PESO (KG)', headerStyle),
+          _cell('PESO PROMEDIO', headerStyle),
+          _cell('CANASTILLAS', headerStyle),
         ],
       ),
       ...lineas.map((l) {
         final esAves = l.rangoTipo == kTipoAves && l.unidades > 0;
         return pw.TableRow(children: [
-          _cell(l.clienteNombre, cellStyle),
           l.esRemanente
               ? pw.Container(
                   padding: const pw.EdgeInsets.symmetric(
@@ -276,27 +279,10 @@ pw.Widget _lineasTable(Despacho d, {required bool esEspecial}) {
                   ),
                 )
               : _cell(l.rangoNombre, cellStyle),
-          _cell(formatNum(l.canastillas), cellStyle),
           _cell(formatNum(l.unidades), cellStyle),
-          esAves
-              ? pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 3),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(formatKg(l.peso), style: cellStyle),
-                      pw.Text(
-                        'Prom: ${formatPesoAve(l.peso, l.unidades)}',
-                        style: pw.TextStyle(
-                            fontSize: 7,
-                            fontStyle: pw.FontStyle.italic,
-                            color: PdfColors.grey600),
-                      ),
-                    ],
-                  ),
-                )
-              : _cell(formatKg(l.peso), cellStyle),
+          _cell(formatKg(l.peso), cellStyle),
+          _cell(esAves ? formatPesoAve(l.peso, l.unidades) : '—', cellStyle),
+          _cell(formatNum(l.canastillas), cellStyle),
         ]);
       }),
       pw.TableRow(
@@ -305,10 +291,10 @@ pw.Widget _lineasTable(Despacho d, {required bool esEspecial}) {
         ),
         children: [
           _cell('TOTAL${esEspecial ? ' ESPECIAL' : ''}', totalStyle),
-          _cell('', totalStyle),
-          _cell(formatNum(totCan), totalStyle),
           _cell(formatNum(totUnid), totalStyle),
           _cell(formatKg(totPeso), totalStyle),
+          _cell('', totalStyle),
+          _cell(formatNum(totCan), totalStyle),
         ],
       ),
     ],
@@ -332,28 +318,6 @@ pw.Widget _observacionesSection(String texto) {
           border: pw.Border.fromBorderSide(pw.BorderSide(width: 0.5)),
         ),
         child: pw.Text(texto, style: bodyStyle),
-      ),
-    ],
-  );
-}
-
-// ── Foto del precinto ───────────────────────────────────────────────────────
-
-pw.Widget _precintoSection(pw.ImageProvider img) {
-  final boldSm = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8);
-  return pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      pw.Text('FOTO PRECINTO DE SEGURIDAD', style: boldSm),
-      pw.SizedBox(height: 4),
-      pw.Container(
-        height: 120,
-        decoration: const pw.BoxDecoration(
-          border: pw.Border.fromBorderSide(pw.BorderSide(width: 0.5)),
-        ),
-        child: pw.Center(
-          child: pw.Image(img, fit: pw.BoxFit.contain),
-        ),
       ),
     ],
   );
@@ -408,13 +372,20 @@ pw.Widget _descartesSection(List<DespachoDescarte> descartes) {
 
 // ── Área de firmas ──────────────────────────────────────────────────────────
 
-pw.Widget _firmas() {
+pw.Widget _firmas(Despacho d) {
   const style = pw.TextStyle(fontSize: 9);
+  final boldSm = pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9);
   return pw.Row(
     children: [
       pw.Expanded(
         child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
           children: [
+            pw.Text('ENCARGADO DESPACHO', style: boldSm),
+            pw.SizedBox(height: 2),
+            pw.Text('Nombre: ${d.encargadoNombre}', style: style),
+            pw.Text('C.C. ${d.encargadoCedula}', style: style),
+            pw.SizedBox(height: 8),
             pw.Container(
                 height: 40,
                 decoration: const pw.BoxDecoration(
@@ -429,7 +400,13 @@ pw.Widget _firmas() {
       pw.SizedBox(width: 40),
       pw.Expanded(
         child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
           children: [
+            pw.Text('ENCARGADO TRANSPORTE', style: boldSm),
+            pw.SizedBox(height: 2),
+            pw.Text('Nombre: ${d.conductorNombre}', style: style),
+            pw.Text('C.C. ${d.conductorCedula}', style: style),
+            pw.SizedBox(height: 8),
             pw.Container(
                 height: 40,
                 decoration: const pw.BoxDecoration(

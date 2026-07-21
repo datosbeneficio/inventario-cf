@@ -129,10 +129,16 @@ class Despacho {
   /// Descartes registrados en este despacho (puede estar vacío).
   final List<DespachoDescarte> descartes;
   final DateTime timestamp;
-  final String? precintoFotoUrl;
   final String observaciones;
   /// Email del usuario que creó el despacho.
   final String creadoPor;
+  /// Persona de la planta responsable de este despacho (no siempre coincide
+  /// con [creadoPor], que es el login genérico usado en el dispositivo).
+  final String encargadoNombre;
+  final String encargadoCedula;
+  /// 'aprobado' o 'aprobado_condicional'.
+  final String dictamen;
+  final bool liberado;
 
   const Despacho({
     required this.id,
@@ -167,9 +173,12 @@ class Despacho {
     required this.lineas,
     this.descartes = const [],
     required this.timestamp,
-    this.precintoFotoUrl,
     this.observaciones = '',
     this.creadoPor = '',
+    this.encargadoNombre = '',
+    this.encargadoCedula = '',
+    this.dictamen = 'aprobado',
+    this.liberado = true,
   });
 
   factory Despacho.fromDoc(DocumentSnapshot doc) {
@@ -222,9 +231,12 @@ class Despacho {
       timestamp: d['timestamp'] != null
           ? (d['timestamp'] as Timestamp).toDate()
           : DateTime.now(),
-      precintoFotoUrl: d['precintoFotoUrl'] as String?,
       observaciones: d['observaciones'] ?? '',
       creadoPor: d['creadoPor'] ?? '',
+      encargadoNombre: d['encargadoNombre'] ?? '',
+      encargadoCedula: d['encargadoCedula'] ?? '',
+      dictamen: d['dictamen'] ?? 'aprobado',
+      liberado: d['liberado'] ?? true,
     );
   }
 
@@ -262,9 +274,12 @@ class Despacho {
         if (descartes.isNotEmpty)
           'descartes': descartes.map((d) => d.toMap()).toList(),
         'timestamp': FieldValue.serverTimestamp(),
-        if (precintoFotoUrl != null) 'precintoFotoUrl': precintoFotoUrl,
         if (observaciones.isNotEmpty) 'observaciones': observaciones,
         if (creadoPor.isNotEmpty) 'creadoPor': creadoPor,
+        'encargadoNombre': encargadoNombre,
+        'encargadoCedula': encargadoCedula,
+        'dictamen': dictamen,
+        'liberado': liberado,
       };
 
   // Totales calculados
